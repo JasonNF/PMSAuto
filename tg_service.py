@@ -33,8 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 挂载 MiniApp 静态目录
-app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")
+# 注意：StaticFiles 的挂载需在 API 路由之后进行（否则 /app/api/* 可能被静态路由拦截导致 405）
 
 @app.get("/healthz")
 async def healthz():
@@ -247,3 +246,6 @@ async def app_redeem(request: Request):
         return {"ok": True, "expires_at": ua.expires_at.isoformat() if ua.expires_at else None, "days_remaining": _compute_days_remaining(ua.expires_at)}
     finally:
         db.close()
+
+# 最后再挂载 MiniApp 静态目录，避免静态路由拦截 /app/api/* 导致 405
+app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")
