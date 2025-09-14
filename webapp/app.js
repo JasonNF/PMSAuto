@@ -1,0 +1,133 @@
+(function(){
+  const logEl = document.getElementById('log');
+  const userEl = document.getElementById('user');
+  const btnReg = document.getElementById('btn-register');
+  const btnPts = document.getElementById('btn-points');
+  const btnRedeem = document.getElementById('btn-redeem');
+
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+  }
+
+  let current = { verify: null, account: null };
+
+  function log(msg){
+    if (!logEl) return;
+    logEl.textContent += `
+${msg}`;
+  }
+
+  function setUserText(txt){
+    if (!userEl) return;
+    userEl.textContent = txt;
+  }
+
+  async function verifyInitData(){
+    const initData = tg?.initData || '';
+    if (!initData) {
+      setUserText('未获取到 Telegram initData');
+      return null;
+    }
+    try {
+      const resp = await fetch('/app/api/verify', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ initData }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        setUserText('验证失败');
+        log(JSON.stringify(data));
+        return null;
+      }
+      const v = data.verify || {};
+      const acc = data.account || {};
+      current = { verify: v, account: acc };
+      const name = v.user?.username || v.user?.first_name || '未知用户';
+      if (acc.bound) {
+        const dr = acc.days_remaining != null ? `${acc.days_remaining} 天` : '未知';
+        setUserText(`已绑定：${name}（到期：${acc.expires_at || '未设置'}｜剩余：${dr}）`);
+      } else {
+        setUserText(`未绑定：${name}`);
+      }
+      return current;
+    } catch (e) {
+      setUserText('验证异常');
+      log(String(e));
+      return null;
+    }
+  }
+
+  if (btnReg) {
+    btnReg.onclick = async () => {
+      const initData = tg?.initData || '';
+      const username = prompt('请输入要注册的用户名：');
+      if (!username) return;
+      const password = prompt('请输入密码：');
+      if (!password) return;
+      const expires = prompt('可选：初始天数（空则不设置）：');
+      try {
+        const resp = await fetch('/app/api/register', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ initData, username, password, expires_days: expires || null }),
+        });
+        const data = await resp.json();
+        if (!data.ok) {
+          log('注册失败：' + JSON.stringify(data));
+          alert('注册失败');
+          return;
+        }
+        alert('注册成功，已自动绑定 Telegram');
+        await verifyInitData();
+      } catch (e) {
+        log('注册异常：' + String(e));
+        alert('注册异常');
+      }
+    };
+  }
+
+  if (btnPts) {
+    btnPts.onclick = async () => {
+      log('刷新账户状态...');
+      await verifyInitData();
+    };
+  }
+
+  if (btnRedeem) {
+    btnRedeem.onclick = async () => {
+      const initData = tg?.initData || '';
+      const acc = current.account || {};
+      if (!acc.bound) {
+        alert('请先注册/绑定');
+        return;
+      }
+      const code = prompt('请输入兑换码：');
+      if (!code) return;
+      try {
+        const resp = await fetch('/app/api/redeem', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ initData, emby_user_id: acc.emby_user_id, code }),
+        });
+        const data = await resp.json();
+        if (!data.ok) {
+          log('兑换失败：' + JSON.stringify(data));
+          alert('兑换失败');
+          return;
+        }
+        alert('兑换成功');
+        await verifyInitData();
+      } catch (e) {
+        log('兑换异常：' + String(e));
+        alert('兑换异常');
+      }
+    };
+  }
+
+  // init
+  (async () => {
+    await verifyInitData();
+  })();
+})();
