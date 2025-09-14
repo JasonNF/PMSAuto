@@ -209,3 +209,107 @@ git push -u origin main
 
 - [Rhilip/AutoRclone](https://github.com/Rhilip/AutoRclone)
 - [xyou365/AutoRclone](https://github.com/xyou365/AutoRclone)
+
+---
+
+### 服务器部署教程（一步一步操作手册）
+
+以下步骤以仓库地址 `https://github.com/JasonNF/PMSAuto` 为例，目标是在服务器常驻运行并通过 openresty/nginx 对外提供服务。
+
+1) 克隆项目
+```
+sudo mkdir -p /opt && cd /opt
+sudo git clone https://github.com/JasonNF/PMSAuto.git
+sudo chown -R $USER:$USER /opt/PMSAuto
+cd /opt/PMSAuto
+```
+
+2) 安装 uv 并安装依赖
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv --version
+uv sync
+```
+
+3) 配置环境变量（EnvironmentFile）
+```
+sudo bash -c 'cat > /etc/pmsauto.env <<EOF
+TELEGRAM_BOT_TOKEN=在此填入你的真实BotToken
+EXTERNAL_BASE_URL=https://your.domain
+EOF'
+sudo chmod 600 /etc/pmsauto.env
+```
+
+4) 配置 systemd 服务
+```
+sudo bash -c 'cat > /etc/systemd/system/pmsauto.service <<EOF
+[Unit]
+Description=PMSAuto Uvicorn Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/PMSAuto
+EnvironmentFile=/etc/pmsauto.env
+# 使用 which uv 获取 uv 的绝对路径替换下行路径
+ExecStart=/root/.local/bin/uv run uvicorn tg_service:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now pmsauto
+sudo systemctl status pmsauto --no-pager
+```
+
+5) 配置 openresty/nginx 反向代理（在你的站点 server { ... } 中合并以下片段）
+```
+location /tg/ {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_redirect off;
+}
+
+location /app/ {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_redirect off;
+}
+
+location = /healthz {
+    proxy_pass http://127.0.0.1:8000/healthz;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_redirect off;
+}
+
+sudo nginx -t && sudo nginx -s reload
+```
+
+6) 验证与设置 Webhook
+```
+curl -sS http://127.0.0.1:8000/healthz     # 本地应为 {"ok": true}
+curl -i https://your.domain/healthz        # 公网应为 200 与 {"ok": true}
+curl -sS https://your.domain/tg/setup      # 返回 {"ok": true, "webhook_url": "https://your.domain/tg/webhook"}
+```
+
+7) 体验
+- Telegram 中发送 `/start`，点击“打开 PMSAuto 应用”进入 MiniApp
+- MiniApp 内可完成“注册/绑定”“兑换码”“刷新状态”等操作
+
+8) 更新与日志
+```
+cd /opt/PMSAuto && git pull
+sudo systemctl restart pmsauto
+journalctl -u pmsauto -f
+```
+
+9) 常见排错
+- 502 Bad Gateway：检查 nginx 反代是否指向 127.0.0.1:8000；本地 `/healthz` 是否为 {"ok": true}
+- Bot 无响应：`journalctl -u pmsauto -e` 查看错误；确认 TELEGRAM_BOT_TOKEN 正确；重新访问 `/tg/setup`
+- MiniApp 404：检查 `location /app/` 反代是否生效
