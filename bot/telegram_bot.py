@@ -4,6 +4,8 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
+EXTERNAL_BASE_URL = os.environ.get("EXTERNAL_BASE_URL") or ""
+WEBAPP_URL = (EXTERNAL_BASE_URL.rstrip("/") + "/app") if EXTERNAL_BASE_URL else "/app"
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 dp = Dispatcher()
@@ -20,7 +22,7 @@ async def cmd_start(message: Message):
             [
                 InlineKeyboardButton(
                     text="打开 PMSAuto 应用",
-                    web_app=WebAppInfo(url="/app")
+                    web_app=WebAppInfo(url=WEBAPP_URL)
                 )
             ]
         ]
@@ -62,7 +64,7 @@ async def cmd_register(message: Message):
     # TODO: 引导到 MiniApp 页面进行注册/绑定
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="打开注册/绑定", web_app=WebAppInfo(url="/app"))]
+            [InlineKeyboardButton(text="打开注册/绑定", web_app=WebAppInfo(url=WEBAPP_URL))]
         ]
     )
     await message.answer("请点击下方按钮打开 MiniApp 完成注册与绑定。", reply_markup=kb)
