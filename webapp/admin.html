@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-cn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PMSAuto 管理后台</title>
+  <link rel="stylesheet" href="/app/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>PMSAuto 管理后台</h1>
+    <p>用于设置“默认初始天数（新注册或首次绑定）”。本页面需要管理员 Bearer Token 才可操作。</p>
+
+    <div class="card">
+      <label for="token">管理员 Token（不会持久化，仅本页内存使用）</label>
+      <input id="token" type="password" placeholder="输入 EMBY_ADMIN_TOKEN" style="width:100%" />
+    </div>
+
+    <div class="card">
+      <div style="margin-bottom:8px;">当前默认初始天数：<b id="current">-</b></div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input id="days" type="number" min="0" max="3650" placeholder="新的默认天数，例如 30" />
+        <button id="btn-load">读取</button>
+        <button id="btn-save">保存</button>
+      </div>
+    </div>
+
+    <pre id="log"></pre>
+  </div>
+  <script src="/app/admin.js?v=20250915-01"></script>
+</body>
+</html>
