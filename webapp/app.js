@@ -26,18 +26,53 @@
         const data = await resp.json();
         const options = (data.available || []);
         if (!options.length) { alert('当前未配置可选线路'); return; }
-        const choice = prompt(`可选线路（逗号分隔）：\n${options.join(', ')}\n\n请输入要绑定的线路：`, (current.account?.bound_route || options[0]));
-        if (!choice) return;
-        const r2 = await fetch(`${API}/routes/bind`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData, route: choice })
+
+        // 渲染弹层
+        const modal = document.getElementById('route-modal');
+        const list = document.getElementById('route-list');
+        const cancel = document.getElementById('route-cancel');
+        if (!modal || !list) { alert('UI 组件缺失'); return; }
+        list.innerHTML = '';
+        const parse = (s) => {
+          // 支持 host|tag1,tag2（后端通过 AVAILABLE_ROUTES 原样下发）
+          const [host, tagsRaw] = String(s).split('|');
+          const tags = (tagsRaw || '').split(',').map(t => t.trim()).filter(Boolean);
+          return { host: host.trim(), tags };
+        };
+        options.map(parse).forEach((item) => {
+          const li = document.createElement('div');
+          li.className = 'route-item';
+          li.innerHTML = `
+            <div class="route-host">${item.host}</div>
+            <div class="route-tags">${item.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+          `;
+          li.onclick = async () => {
+            try {
+              const r2 = await fetch(`${API}/routes/bind`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ initData, route: item.host })
+              });
+              const t2 = await r2.text();
+              let j2; try { j2 = JSON.parse(t2); } catch(_) { j2 = { ok:false, raw:t2 }; }
+              if (!j2.ok) { alert('绑定失败'); log('绑定线路失败: ' + t2); return; }
+              modal.classList.remove('show');
+              await verifyInitData();
+            } catch (e) {
+              log('绑定异常：' + String(e));
+            }
+          };
+          list.appendChild(li);
         });
-        const t2 = await r2.text();
-        let j2; try { j2 = JSON.parse(t2); } catch(_) { j2 = { ok:false, raw:t2 }; }
-        if (!j2.ok) { alert('绑定失败'); log('绑定线路失败: ' + t2); return; }
-        alert('绑定成功');
-        await verifyInitData();
+        modal.classList.add('show');
+        const onClose = (ev) => {
+          const target = ev.target;
+          if (target && (target.dataset?.close === 'route-modal')) {
+            modal.classList.remove('show');
+            modal.removeEventListener('click', onClose);
+          }
+        };
+        modal.addEventListener('click', onClose);
+        if (cancel) cancel.onclick = () => { modal.classList.remove('show'); };
       } catch (e) {
         log('获取/绑定线路异常：' + String(e));
       }

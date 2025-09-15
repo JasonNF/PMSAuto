@@ -18,6 +18,18 @@
         <p>账户信息与服务管理</p>
       </div>
 
+      <!-- 线路选择弹层（点击“绑定线路”时显示） -->
+      <div id="route-modal" class="modal" aria-hidden="true">
+        <div class="modal-backdrop" data-close="route-modal"></div>
+        <div class="modal-panel">
+          <div class="modal-title">选择线路</div>
+          <div id="route-list" class="route-list"></div>
+          <div class="modal-actions">
+            <button class="btn ghost" id="route-cancel" data-close="route-modal">取消</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card profile">
         <div class="card-title with-icon">
           <span class="icon">👤</span>
