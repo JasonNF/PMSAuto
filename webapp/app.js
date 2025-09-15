@@ -37,6 +37,11 @@
       try{
         await navigator.clipboard.writeText(text);
         toast('已复制到剪贴板');
+        // 切换按钮图标为勾号
+        const btn = target;
+        if (!btn.dataset.orig){ btn.dataset.orig = btn.innerHTML; }
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 7L10 17l-6-6" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        setTimeout(() => { if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig; }, 1200);
       }catch(err){
         // 回退：创建临时输入
         try{
@@ -47,7 +52,25 @@
           document.execCommand('copy');
           document.body.removeChild(inp);
           toast('已复制到剪贴板');
+          const btn = target;
+          if (!btn.dataset.orig){ btn.dataset.orig = btn.innerHTML; }
+          btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 7L10 17l-6-6" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          setTimeout(() => { if (btn.dataset.orig) btn.innerHTML = btn.dataset.orig; }, 1200);
         }catch(_){ toast('复制失败'); }
+      }
+    }
+  });
+
+  // 整行点击进入链接（讨论项）
+  document.addEventListener('click', (e) => {
+    const target = e.target;
+    // 如果点击在复制按钮或锚点上，交给它们自己处理
+    if (target.closest && target.closest('.icon-btn, a')) return;
+    const row = target.closest && target.closest('.discuss-item[data-url]');
+    if (row){
+      const url = row.getAttribute('data-url');
+      if (url){
+        window.open(url, '_blank');
       }
     }
   });

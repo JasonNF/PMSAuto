@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title>Megaphone</title>
+  <path d="M4 11c6-4 10-4 16-4v10c-6 0-10 0-16-4v-2Z" fill="#ffffff"/>
+  <path d="M7 13v4a2 2 0 0 0 2 2h2v-2H9v-4H7Z" fill="#ffffff"/>
+</svg>

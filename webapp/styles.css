@@ -162,3 +162,18 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 /* 轻量 Toast */
 #toast{ position: fixed; left:50%; bottom: 12%; transform: translateX(-50%); background: rgba(17,24,39,.92); color:#fff; padding:10px 14px; border-radius:10px; opacity:0; pointer-events:none; transition: opacity .2s ease; z-index:99; font-size:14px; }
 #toast.show{ opacity:1; }
+
+/* 讨论列表美化 */
+.discuss-list{ gap: 12px; }
+.discuss-item{ background:#fff; border-radius:16px; padding:12px 12px; display:flex; align-items:center; justify-content:space-between; box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
+.discuss-item .li-left{ display:flex; align-items:center; gap:12px; }
+.discuss-item .li-icon{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; box-shadow: 0 6px 16px rgba(17,24,39,.08), inset 0 0 0 1px rgba(0,0,0,.06); }
+.discuss-item .li-icon.green{ background: linear-gradient(180deg, #34d399, #10b981); }
+.discuss-item .li-icon.orange{ background: linear-gradient(180deg, #f59e0b, #f97316); }
+.discuss-item .li-text .li-title{ font-weight:800; }
+.discuss-item .li-text .li-sub{ color:#6b7280; }
+.discuss-item .icon-actions{ display:flex; align-items:center; gap:8px; }
+.icon-btn{ width:40px; height:40px; border-radius:12px; background:#eef2ff; display:inline-flex; align-items:center; justify-content:center; box-shadow: 0 8px 18px rgba(59,130,246,.18), inset 0 0 0 1px rgba(59,130,246,.15); }
+.icon-btn.enter{ background:#e0ecff; }
+.icon-btn.copy{ background:#eef2ff; }
+.icon-btn svg{ display:block; }
