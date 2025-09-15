@@ -389,11 +389,28 @@ async def app_verify(request: Request):
                     if hours > 0: return "★"
                     return "☆"
 
+                # 标准化注册时间：提供 UTC ISO 与东八区本地日期（用于前端到天展示）
+                created_at_iso = None
+                created_date_cn = None
+                try:
+                    ca = ua.created_at
+                    if ca:
+                        if ca.tzinfo is None:
+                            ca_utc = ca.replace(tzinfo=timezone.utc)
+                        else:
+                            ca_utc = ca.astimezone(timezone.utc)
+                        created_at_iso = ca_utc.isoformat().replace("+00:00", "Z")
+                        created_date_cn = (ca_utc + timedelta(hours=8)).strftime("%Y-%m-%d")
+                except Exception:
+                    pass
+
                 info = {
                     "bound": True,
                     "username": ua.username,
                     "emby_user_id": ua.emby_user_id,
                     "created_at": ua.created_at.isoformat() if ua.created_at else None,
+                    "created_at_utc": created_at_iso,
+                    "created_date_local_cn": created_date_cn,
                     "expires_at": ua.expires_at.isoformat() if ua.expires_at else None,
                     "days_remaining": _compute_days_remaining(ua.expires_at),
                     "points": round(max(0.0, pts + extra_pts - used_pts), 2),

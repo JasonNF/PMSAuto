@@ -373,7 +373,7 @@
       const embyCreatedEl = document.getElementById('emby-created');
       const embyLevelEl = document.getElementById('emby-level');
       if (embyUserEl) embyUserEl.textContent = acc.username || '-';
-      if (embyCreatedEl) embyCreatedEl.textContent = fmtDateDay(acc.created_at) || '-';
+      if (embyCreatedEl) embyCreatedEl.textContent = (acc.created_date_local_cn || fmtDateDay(acc.created_at) || '-');
       if (embyLevelEl) embyLevelEl.textContent = acc.watch_level || '☆';
 
       // Emby 线路信息填充
