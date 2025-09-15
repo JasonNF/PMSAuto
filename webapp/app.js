@@ -3,6 +3,7 @@
   const userEl = document.getElementById('user');
   const btnReg = document.getElementById('btn-register');
   const btnPts = document.getElementById('btn-points');
+  const btnBindExisting = document.getElementById('btn-bind-existing');
   const btnRedeem = document.getElementById('btn-redeem');
 
   // 统一 API 基址，避免在某些 WebView 下相对路径解析异常
@@ -98,6 +99,33 @@
     btnPts.onclick = async () => {
       log('刷新账户状态...');
       await verifyInitData();
+    };
+  }
+
+  if (btnBindExisting) {
+    btnBindExisting.onclick = async () => {
+      const initData = tg?.initData || '';
+      const embyId = prompt('请输入已有 Emby 用户ID（如从管理后台复制）：');
+      if (!embyId) return;
+      try {
+        const resp = await fetch(`${API}/bind`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData, emby_user_id: embyId }),
+        });
+        const text = await resp.text();
+        let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
+        if (!data.ok) {
+          log('绑定失败：' + JSON.stringify(data));
+          alert('绑定失败，请确认用户ID是否正确');
+          return;
+        }
+        alert('绑定成功');
+        await verifyInitData();
+      } catch (e) {
+        log('绑定异常：' + String(e));
+        alert('绑定异常');
+      }
     };
   }
 
