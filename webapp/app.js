@@ -5,6 +5,7 @@
   const btnPts = document.getElementById('btn-points');
   const btnBindExisting = document.getElementById('btn-bind-existing');
   const btnRedeem = document.getElementById('btn-redeem');
+  const btnRoute = document.getElementById('btn-route');
 
   // 统一 API 基址，避免在某些 WebView 下相对路径解析异常
   const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
@@ -13,6 +14,32 @@
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
+  }
+
+  if (btnRoute) {
+    btnRoute.onclick = async () => {
+      const initData = tg?.initData || '';
+      try {
+        const resp = await fetch(`${API}/routes`, { method: 'GET' });
+        const data = await resp.json();
+        const options = (data.available || []);
+        if (!options.length) { alert('当前未配置可选线路'); return; }
+        const choice = prompt(`可选线路（逗号分隔）：\n${options.join(', ')}\n\n请输入要绑定的线路：`, (current.account?.bound_route || options[0]));
+        if (!choice) return;
+        const r2 = await fetch(`${API}/routes/bind`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData, route: choice })
+        });
+        const t2 = await r2.text();
+        let j2; try { j2 = JSON.parse(t2); } catch(_) { j2 = { ok:false, raw:t2 }; }
+        if (!j2.ok) { alert('绑定失败'); log('绑定线路失败: ' + t2); return; }
+        alert('绑定成功');
+        await verifyInitData();
+      } catch (e) {
+        log('获取/绑定线路异常：' + String(e));
+      }
+    };
   }
 
   let current = { verify: null, account: null };
@@ -78,6 +105,12 @@
       if (kvDays) kvDays.textContent = (acc.days_remaining ?? '未知');
       if (kvPts) kvPts.textContent = (typeof acc.points !== 'undefined' ? acc.points : 0).toString();
       if (kvDon) kvDon.textContent = (typeof acc.donation !== 'undefined' ? acc.donation : 0).toString();
+
+      // Emby 线路信息填充
+      const elEntry = document.getElementById('emby-entry');
+      const elBound = document.getElementById('emby-bound');
+      if (elEntry) elEntry.textContent = (acc.entry_route || '-');
+      if (elBound) elBound.textContent = (acc.bound_route || '未设置');
 
       return current;
     } catch (e) {

@@ -25,6 +25,8 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 WEBHOOK_PATH = "/tg/webhook"
 EXTERNAL_BASE_URL = os.environ.get("EXTERNAL_BASE_URL") or ""
 ADMIN_BEARER_TOKEN = os.environ.get("EMBY_ADMIN_TOKEN") or os.environ.get("ADMIN_BEARER_TOKEN") or ""
+# 可提供多条可选线路（以英文逗号分隔），例如：AVAILABLE_ROUTES="a.domain.com:emby,b.domain.com:emby"
+AVAILABLE_ROUTES = [s.strip() for s in (os.environ.get("AVAILABLE_ROUTES") or "").split(",") if s.strip()]
 
 app = FastAPI(title="PMSAuto Unified Service", version="0.1.0")
 
@@ -243,6 +245,14 @@ async def app_verify(request: Request):
                 # 通知偏好
                 pref = db.query(UserPref).filter(UserPref.emby_user_id == ua.emby_user_id).first()
                 notify_enabled = not bool(pref and pref.notify_opt_out)
+                # 读取用户绑定线路（保存在 Settings 表，key=route:{emby_user_id}）
+                try:
+                    route_key = f"route:{ua.emby_user_id}"
+                    kv_route = db.query(Settings).filter(Settings.key == route_key).first()
+                    bound_route = (kv_route.value if kv_route and kv_route.value else None)
+                except Exception:
+                    bound_route = None
+
                 info = {
                     "bound": True,
                     "username": ua.username,
@@ -252,10 +262,60 @@ async def app_verify(request: Request):
                     "points": pts,
                     "donation": donation_amt,
                     "notify_enabled": notify_enabled,
+                    "entry_route": os.environ.get("EMBY_BASE_URL") or "",
+                    "bound_route": bound_route,
+                    "available_routes": AVAILABLE_ROUTES,
                 }
         finally:
             db.close()
     return JSONResponse({"ok": True, "verify": verified, "account": info})
+
+@app.get("/app/api/routes")
+async def app_get_routes(request: Request):
+    body = await request.json() if request.method == "POST" else {}
+    init_data = body.get("initData") or (await request.body()).decode("utf-8") if body == {} else body.get("initData")
+    verified = verify_webapp_initdata(init_data) if init_data else {"tg_id": None}
+    tg_id = verified.get("tg_id")
+    db = SessionLocal()
+    try:
+        ua = _get_account_by_tg_id(db, tg_id) if tg_id else None
+        if not ua:
+            return {"ok": True, "available": AVAILABLE_ROUTES, "bound": None}
+        kv = db.query(Settings).filter(Settings.key == f"route:{ua.emby_user_id}").first()
+        bound = kv.value if kv and kv.value else None
+        return {"ok": True, "available": AVAILABLE_ROUTES, "bound": bound}
+    finally:
+        db.close()
+
+@app.post("/app/api/routes/bind")
+async def app_bind_route(request: Request):
+    body = await request.json()
+    init_data = body.get("initData") or ""
+    route = (body.get("route") or "").strip()
+    if not route:
+        raise HTTPException(400, "route 必填")
+    if AVAILABLE_ROUTES and route not in AVAILABLE_ROUTES:
+        raise HTTPException(400, "不在可选线路列表中")
+    verified = verify_webapp_initdata(init_data)
+    tg_id = verified.get("tg_id")
+    if not tg_id:
+        raise HTTPException(400, "未获取到 Telegram 用户")
+    db = SessionLocal()
+    try:
+        ua = _get_account_by_tg_id(db, tg_id)
+        if not ua:
+            raise HTTPException(404, "未绑定账户")
+        key = f"route:{ua.emby_user_id}"
+        kv = db.query(Settings).filter(Settings.key == key).first()
+        if not kv:
+            kv = Settings(key=key, value=route)
+        else:
+            kv.value = route
+        db.add(kv)
+        db.commit()
+        return {"ok": True, "route": route}
+    finally:
+        db.close()
 
 
 def _get_account_by_tg_id(db, tg_id: str):
