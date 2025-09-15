@@ -29,15 +29,29 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 # ----- Emby API helpers -----
-HEADERS = {"X-Emby-Token": EMBY_API_TOKEN}
+# 同时通过 Header 与 Query 传递令牌，兼容不同 Emby 反代/版本要求
+HEADERS = {
+    "Content-Type": "application/json",
+    "X-Emby-Token": EMBY_API_TOKEN,
+}
 
 
 def emby_create_user(username: str) -> dict:
+    # 若已存在同名用户，先报错，避免 Emby 返回不直观的 400
+    exists = emby_find_user_by_name(username)
+    if exists:
+        raise HTTPException(status_code=400, detail=f"User already exists: {username}")
     url = f"{EMBY_BASE_URL}/Users/New"
-    resp = requests.post(url, headers=HEADERS, json={"Name": username})
+    resp = requests.post(
+        url,
+        headers=HEADERS,
+        params={"api_key": EMBY_API_TOKEN},
+        json={"Name": username},
+    )
     if resp.status_code >= 300:
-        logger.error(resp.text)
-        raise HTTPException(status_code=resp.status_code, detail="Create user failed")
+        txt = resp.text
+        logger.error(txt)
+        raise HTTPException(status_code=resp.status_code, detail=f"Create user failed: {txt}")
     return resp.json()
 
 
@@ -49,20 +63,50 @@ def emby_set_password(user_id: str, new_password: str) -> None:
         "NewPw": new_password,
         "CurrentPw": "",
     }
-    resp = requests.post(url, headers=HEADERS, json=payload)
+    resp = requests.post(
+        url,
+        headers=HEADERS,
+        params={"api_key": EMBY_API_TOKEN},
+        json=payload,
+    )
     if resp.status_code >= 300:
-        logger.error(resp.text)
-        raise HTTPException(status_code=resp.status_code, detail="Set password failed")
+        txt = resp.text
+        logger.error(txt)
+        raise HTTPException(status_code=resp.status_code, detail=f"Set password failed: {txt}")
 
 
 def emby_set_disabled(user_id: str, is_disabled: bool) -> None:
     # Emby: POST /Users/{id}/Policy with body containing "IsDisabled"
     url = f"{EMBY_BASE_URL}/Users/{user_id}/Policy"
     payload = {"IsDisabled": is_disabled}
-    resp = requests.post(url, headers=HEADERS, json=payload)
+    resp = requests.post(url, headers=HEADERS, params={"api_key": EMBY_API_TOKEN}, json=payload)
     if resp.status_code >= 300:
-        logger.error(resp.text)
-        raise HTTPException(status_code=resp.status_code, detail="Update policy failed")
+        txt = resp.text
+        logger.error(txt)
+        raise HTTPException(status_code=resp.status_code, detail=f"Update policy failed: {txt}")
+
+
+def emby_find_user_by_name(username: str) -> dict | None:
+    """尝试通过 Emby Users 列表查找同名用户，避免重复创建。
+    说明：不同 Emby 版本的搜索参数可能存在差异，这里使用全量列表做一次本地精确匹配，兼容性最好。
+    """
+    try:
+        url = f"{EMBY_BASE_URL}/Users"
+        resp = requests.get(url, headers=HEADERS, params={"api_key": EMBY_API_TOKEN})
+        if resp.status_code >= 300:
+            logger.warning("List users failed: %s", resp.text)
+            return None
+        items = resp.json() or []
+        for it in items:
+            try:
+                if (it.get("Name") or "").strip().lower() == (username or "").strip().lower():
+                    return it
+            except Exception:
+                continue
+        return None
+    except Exception as e:
+        logger.warning("find_user_by_name error: %s", e)
+        return None
 
 # ----- Schemas -----
 class RegisterReq(BaseModel):
