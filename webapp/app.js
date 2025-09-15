@@ -365,9 +365,16 @@
       if (embyLevelEl) embyLevelEl.textContent = acc.watch_level || '☆';
 
       // Emby 线路信息填充
+      const elEntryWrap = document.getElementById('emby-entry-wrap');
       const elEntry = document.getElementById('emby-entry');
+      const elEntryCopy = document.getElementById('emby-entry-copy');
+      const elEntryOpen = document.getElementById('emby-entry-open');
       const elBound = document.getElementById('emby-bound');
-      if (elEntry) elEntry.textContent = (acc.entry_route || '-');
+      const routeText = (acc.entry_route || '-');
+      if (elEntry) elEntry.textContent = routeText;
+      if (elEntryWrap) elEntryWrap.setAttribute('data-copy', acc.entry_route || '');
+      if (elEntryCopy) elEntryCopy.setAttribute('data-copy', acc.entry_route || '');
+      if (elEntryOpen) elEntryOpen.href = acc.entry_route || '#';
       if (elBound) {
         const has = !!acc.bound_route;
         elBound.textContent = (acc.bound_route || '未设置');

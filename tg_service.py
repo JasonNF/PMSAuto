@@ -295,7 +295,7 @@ async def app_verify(request: Request):
                     "watch_level": _watch_level(watch_hours),
                     "donation": donation_amt,
                     "notify_enabled": notify_enabled,
-                    "entry_route": os.environ.get("EMBY_BASE_URL") or "",
+                    "entry_route": _normalize_entry_url(),
                     "bound_route": bound_route,
                     "available_routes": AVAILABLE_ROUTES,
                     "_points_base": pts,
@@ -384,6 +384,21 @@ def _get_default_initial_days(db) -> int:
     except Exception:
         pass
     return 30
+
+
+def _normalize_entry_url() -> str:
+    """优先使用 EMBY_ENTRY_URL；否则从 EMBY_BASE_URL 去掉末尾的 /emby 路径与多余斜杠。
+    示例：
+      EMBY_BASE_URL=https://emby.misaya.org/emby -> https://emby.misaya.org
+    """
+    entry = os.environ.get("EMBY_ENTRY_URL")
+    if entry:
+        return entry.rstrip("/")
+    base = (os.environ.get("EMBY_BASE_URL") or "").strip()
+    base = base.rstrip("/")
+    if base.endswith("/emby"):
+        base = base[:-5]
+    return base
 
 
 # ===== 幸运大转盘 =====
