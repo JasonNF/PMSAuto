@@ -5,7 +5,7 @@
   const btnPts = document.getElementById('btn-points');
   const btnBindExisting = document.getElementById('btn-bind-existing');
   const btnRedeem = document.getElementById('btn-redeem');
-  const btnRoute = document.getElementById('btn-route');
+  const btnRoute = null; // 移除独立按钮，改为点击绑定线路徽章触发
 
   // 统一 API 基址，避免在某些 WebView 下相对路径解析异常
   const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
@@ -16,8 +16,10 @@
     tg.ready();
   }
 
-  if (btnRoute) {
-    btnRoute.onclick = async () => {
+  // 点击“绑定线路”徽章即可选择线路
+  const boundEl = document.getElementById('emby-bound');
+  if (boundEl) {
+    boundEl.onclick = async () => {
       const initData = tg?.initData || '';
       try {
         const resp = await fetch(`${API}/routes`, { method: 'GET' });

@@ -119,9 +119,13 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .card.emby .card-title{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:16px 12px; font-size:20px; font-weight:800; background: linear-gradient(180deg, rgba(37,99,235,.12), rgba(37,99,235,.04)); border-bottom:1px solid rgba(15,23,42,.08); }
 .card.emby .with-icon .icon{ margin-right:0; }
 .card.emby .kv{ padding: 12px 14px; }
-.card.emby .kv > div{ display:flex; align-items:center; gap:8px; justify-content:space-between; padding:14px 2px; border-bottom: 1px solid rgba(15,23,42,.08); }
+.card.emby .kv > div{ display:flex; align-items:center; gap:8px; justify-content:flex-start; padding:14px 2px; border-bottom: 1px solid rgba(15,23,42,.08); }
 .card.emby .kv > div:last-child{ border-bottom:0; }
 .card.emby .row-icon{ width:20px; text-align:center; opacity:.85; }
-.card.emby .k{ min-width:auto; color: var(--muted); }
+.card.emby .k{ min-width: 92px; color: var(--muted); }
 .card.emby .v{ font-weight:600; }
 .card.emby .card-actions{ padding: 10px 14px 14px; }
+
+/* 绑定线路徽章可点击选择 */
+#emby-bound{ cursor:pointer; user-select:none; box-shadow: inset 0 0 0 1px rgba(59,130,246,.2); }
+#emby-bound:hover{ box-shadow: inset 0 0 0 1px rgba(59,130,246,.4); }
