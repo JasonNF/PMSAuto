@@ -33,7 +33,9 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .hero-card h2{ margin:0 0 8px; }
 .hero-card p{ margin:0; color: var(--muted); }
 
-.card { background: var(--card); color: var(--text); border-radius: 18px; padding: 14px; margin: 14px 6px; box-shadow: 0 10px 30px rgba(0,0,0,.12); overflow: hidden; }
+.card { background: var(--card); color: var(--text); border-radius: 18px; padding: 14px; margin: 14px 6px; box-shadow: 0 14px 28px rgba(0,0,0,.12), 0 8px 12px rgba(0,0,0,.06); overflow: hidden; transform: translateZ(0); transition: box-shadow .25s ease, transform .25s ease; }
+.card:hover{ transform: translateY(-4px); box-shadow: 0 18px 36px rgba(0,0,0,.16), 0 12px 20px rgba(0,0,0,.08); }
+.card:active{ transform: translateY(-1px); box-shadow: 0 16px 32px rgba(0,0,0,.14), 0 10px 16px rgba(0,0,0,.08); }
 .card-title { font-weight: 700; margin-bottom: 10px; }
 .with-icon .icon { margin-right: 6px; }
 .kv .k{ color: var(--muted); display:inline-block; min-width: 84px; line-height: 1.6; }
