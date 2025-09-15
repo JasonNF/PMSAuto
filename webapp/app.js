@@ -198,15 +198,11 @@
 
       // 详细字段填充
       const kvBound = document.getElementById('kv-bound');
-      const kvUser = document.getElementById('kv-username');
       const kvExp = document.getElementById('kv-exp');
-      const kvDays = document.getElementById('kv-days');
       const kvPts = document.getElementById('kv-points');
       const kvDon = document.getElementById('kv-donation');
       if (kvBound) kvBound.textContent = acc.bound ? '已绑定' : '未绑定';
-      if (kvUser) kvUser.textContent = acc.username || '-';
       if (kvExp) kvExp.textContent = acc.expires_at || '未设置';
-      if (kvDays) kvDays.textContent = (acc.days_remaining ?? '未知');
       if (kvPts) kvPts.textContent = (typeof acc.points !== 'undefined' ? acc.points : 0).toString();
       if (kvDon) kvDon.textContent = (typeof acc.donation !== 'undefined' ? acc.donation : 0).toString();
 
