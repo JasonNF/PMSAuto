@@ -38,16 +38,32 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card emby">
         <div class="card-title with-icon">
-          <span class="icon">🧿</span>
+          <span class="icon">🔷</span>
           <span>Emby 账户</span>
         </div>
         <div class="kv">
-          <div><span class="k">用户名：</span><span class="v" id="emby-username">-</span></div>
-          <div><span class="k">破壳日：</span><span class="v" id="emby-exp">-</span></div>
-          <div><span class="k">观看等级：</span><span class="v">☆</span></div>
-          <div><span class="k">资料库权限：</span><span class="v">全部</span></div>
+          <div>
+            <span class="row-icon">👤</span>
+            <span class="k">用户名：</span>
+            <span class="v" id="emby-username">-</span>
+          </div>
+          <div>
+            <span class="row-icon">📅</span>
+            <span class="k">注册日期：</span>
+            <span class="v" id="emby-exp">-</span>
+          </div>
+          <div>
+            <span class="row-icon">⏱️</span>
+            <span class="k">观看等级：</span>
+            <span class="v" id="emby-level">☆</span>
+          </div>
+          <div>
+            <span class="row-icon">📁</span>
+            <span class="k">资料库权限：</span>
+            <span class="v badge badge-green" id="emby-perm">全部</span>
+          </div>
         </div>
         <div class="card-actions">
           <button class="btn" id="btn-redeem">兑换码</button>
