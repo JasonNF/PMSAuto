@@ -384,3 +384,37 @@ curl -sS https://pms.misaya.org/tg/setup         # 期望 {"ok": true, "webhook_
   - 后端是否监听 `127.0.0.1:8000` 或 `0.0.0.0:8000`（异机需非回环地址）
 - getWebhookInfo 显示 502：
   - 说明 Telegram 访问 `/tg/webhook` 失败；重复自检 /healthz 与 NPM 路由
+
+---
+
+### 一键更新部署（生产环境）
+
+当你已经完成首次部署后，可通过仓库脚本一键更新、安装依赖并重启服务：
+
+1) 赋权脚本
+```
+sudo chmod +x /opt/PMSAuto/scripts/update.sh
+```
+
+2) 执行更新
+```
+sudo /opt/PMSAuto/scripts/update.sh
+```
+
+3) 机器人自检（可选）
+```
+curl -sS https://你的域名/tg/me
+curl -sS https://api.telegram.org/bot<你的TOKEN>/getWebhookInfo
+```
+
+4) 如需重置 Webhook（可选）
+```
+curl -sS https://你的域名/tg/setup
+```
+
+脚本完成的动作包括：
+- git pull 最新代码
+- 创建或复用虚拟环境 `.venv`
+- 安装依赖（按 `pyproject.toml`），并固定 `requests==2.31.0`
+- `systemctl restart pmsauto` 并输出 `status`
+- 健康检查 `http://127.0.0.1:8000/healthz`
