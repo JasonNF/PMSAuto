@@ -5,6 +5,10 @@
   const btnPts = document.getElementById('btn-points');
   const btnRedeem = document.getElementById('btn-redeem');
 
+  // 统一 API 基址，避免在某些 WebView 下相对路径解析异常
+  const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
+  const API = origin + '/app/api';
+
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
@@ -14,8 +18,7 @@
 
   function log(msg){
     if (!logEl) return;
-    logEl.textContent += `
-${msg}`;
+    logEl.textContent += `\n${msg}`;
   }
 
   function setUserText(txt){
@@ -30,15 +33,17 @@ ${msg}`;
       return null;
     }
     try {
-      const resp = await fetch('/app/api/verify', {
+      const resp = await fetch(`${API}/verify`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ initData }),
       });
-      const data = await resp.json();
+      const text = await resp.text();
+      let data;
+      try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
       if (!data.ok) {
         setUserText('验证失败');
-        log(JSON.stringify(data));
+        log(typeof data === 'string' ? data : JSON.stringify(data));
         return null;
       }
       const v = data.verify || {};
@@ -68,12 +73,13 @@ ${msg}`;
       if (!password) return;
       const expires = prompt('可选：初始天数（空则不设置）：');
       try {
-        const resp = await fetch('/app/api/register', {
+        const resp = await fetch(`${API}/register`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ initData, username, password, expires_days: expires || null }),
         });
-        const data = await resp.json();
+        const text = await resp.text();
+        let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
         if (!data.ok) {
           log('注册失败：' + JSON.stringify(data));
           alert('注册失败');
@@ -106,12 +112,13 @@ ${msg}`;
       const code = prompt('请输入兑换码：');
       if (!code) return;
       try {
-        const resp = await fetch('/app/api/redeem', {
+        const resp = await fetch(`${API}/redeem`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ initData, emby_user_id: acc.emby_user_id, code }),
         });
-        const data = await resp.json();
+        const text = await resp.text();
+        let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
         if (!data.ok) {
           log('兑换失败：' + JSON.stringify(data));
           alert('兑换失败');
