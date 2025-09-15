@@ -16,11 +16,23 @@
     tg.ready();
   }
 
-  // 简单日期格式化：仅保留 YYYY-MM-DD
+  // 简单日期格式化（本地时区）：仅保留 YYYY-MM-DD
   function fmtDateDay(s){
-    if (!s || typeof s !== 'string') return '';
-    const i = s.indexOf('T');
-    return (i > 0 ? s.slice(0, i) : s).slice(0, 10);
+    if (!s) return '';
+    try{
+      const d = new Date(s);
+      if (!isNaN(d.getTime())){
+        const y = d.getFullYear();
+        const m = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        return `${y}-${m}-${dd}`;
+      }
+    }catch(_){ /* ignore */ }
+    if (typeof s === 'string'){
+      const i = s.indexOf('T');
+      return (i > 0 ? s.slice(0, i) : s).slice(0, 10);
+    }
+    return '';
   }
 
   // 检测 SF Symbols Web 字体加载完成，加载后隐藏 SVG 兜底

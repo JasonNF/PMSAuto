@@ -56,6 +56,7 @@ def _startup_create_tables():
         db = SessionLocal()
         try:
             kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
+            default_days_env = os.environ.get("DEFAULT_INITIAL_DAYS")
             if not kv:
                 default_days_env = os.environ.get("DEFAULT_INITIAL_DAYS")
                 try:
@@ -65,6 +66,17 @@ def _startup_create_tables():
                 kv = Settings(key="default_initial_days", value=str(init_days))
                 db.add(kv)
                 db.commit()
+            else:
+                # 若未设置环境变量覆盖，且当前值小于 180，则提升到 180
+                if default_days_env is None:
+                    try:
+                        cur = int(kv.value)
+                    except Exception:
+                        cur = 0
+                    if cur < 180:
+                        kv.value = "180"
+                        db.add(kv)
+                        db.commit()
         finally:
             db.close()
         logger.info("数据库表检查/创建完成")
@@ -103,6 +115,95 @@ async def admin_get_default_days(request: Request):
     db = SessionLocal()
     try:
         return {"default_initial_days": _get_default_initial_days(db)}
+    finally:
+        db.close()
+
+
+# ---- Admin: 用户到期时间管理（Bearer 保护） ----
+@app.post("/admin/user/extend_days")
+async def admin_user_extend_days(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    emby_user_id = str(body.get("emby_user_id") or "").strip()
+    days = int(body.get("days") or 0)
+    if not emby_user_id:
+        raise HTTPException(400, "emby_user_id 必填")
+    if days == 0:
+        raise HTTPException(400, "days 不能为 0")
+    db = SessionLocal()
+    try:
+        ua = db.query(UserAccount).filter(UserAccount.emby_user_id == emby_user_id).first()
+        if not ua:
+            raise HTTPException(404, "用户不存在")
+        from datetime import datetime as dt, timedelta as td
+        base = ua.expires_at or dt.utcnow()
+        ua.expires_at = base + td(days=days)
+        db.add(ua)
+        db.commit()
+        return {"ok": True, "expires_at": ua.expires_at.isoformat() if ua.expires_at else None}
+    finally:
+        db.close()
+
+
+@app.post("/admin/user/set_expires_by_name")
+async def admin_user_set_expires_by_name(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    username = str(body.get("username") or "").strip()
+    days_from_now = body.get("days_from_now")
+    if not username:
+        raise HTTPException(400, "username 必填")
+    if days_from_now is None:
+        raise HTTPException(400, "days_from_now 必填")
+    try:
+        days_from_now = int(days_from_now)
+    except Exception:
+        raise HTTPException(400, "days_from_now 必须为整数")
+    if days_from_now < 0 or days_from_now > 3650:
+        raise HTTPException(400, "days_from_now 应在 0~3650 之间")
+    db = SessionLocal()
+    try:
+        ua = db.query(UserAccount).filter(UserAccount.username == username).first()
+        if not ua:
+            raise HTTPException(404, "用户不存在")
+        from datetime import datetime as dt, timedelta as td
+        ua.expires_at = (dt.utcnow() + td(days=days_from_now)) if days_from_now > 0 else None
+        db.add(ua)
+        db.commit()
+        return {"ok": True, "emby_user_id": ua.emby_user_id, "expires_at": ua.expires_at.isoformat() if ua.expires_at else None}
+    finally:
+        db.close()
+
+
+@app.post("/admin/user/set_expires")
+async def admin_user_set_expires(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    emby_user_id = str(body.get("emby_user_id") or "").strip()
+    days_from_now = body.get("days_from_now")
+    if not emby_user_id:
+        raise HTTPException(400, "emby_user_id 必填")
+    if days_from_now is None:
+        raise HTTPException(400, "days_from_now 必填")
+    try:
+        days_from_now = int(days_from_now)
+    except Exception:
+        raise HTTPException(400, "days_from_now 必须为整数")
+    if days_from_now < 0 or days_from_now > 3650:
+        raise HTTPException(400, "days_from_now 应在 0~3650 之间")
+    db = SessionLocal()
+    try:
+        ua = db.query(UserAccount).filter(UserAccount.emby_user_id == emby_user_id).first()
+        if not ua:
+            raise HTTPException(404, "用户不存在")
+        from datetime import datetime as dt, timedelta as td
+        ua.expires_at = (dt.utcnow() + td(days=days_from_now)) if days_from_now > 0 else None
+        db.add(ua)
+        db.commit()
+        return {"ok": True, "expires_at": ua.expires_at.isoformat() if ua.expires_at else None}
     finally:
         db.close()
 
