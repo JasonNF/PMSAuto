@@ -16,6 +16,16 @@
       <input id="token" type="password" placeholder="输入 EMBY_ADMIN_TOKEN" style="width:100%" />
     </div>
 
+  <div class="card">
+    <h3>幸运大转盘配置</h3>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+      <button id="wheel-load">读取配置</button>
+      <button id="wheel-save">保存配置</button>
+      <small>读取无需 Token，保存需要管理员 Token</small>
+    </div>
+    <textarea id="wheel-json" style="width:100%; min-height:220px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;" placeholder='{"min_points":30,"cost_points":5,"items":[{"label":"积分+10","color":"#60a5fa","weight":1}]}'></textarea>
+  </div>
+
     <div class="card">
       <div style="margin-bottom:8px;">当前默认初始天数：<b id="current">-</b></div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -46,6 +56,8 @@
       </div>
       <div>当前捐赠金额：<b id="don-cur">-</b></div>
     </div>
+
+    
 
     <div class="card">
       <h3>观看时长管理</h3>

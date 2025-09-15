@@ -99,12 +99,27 @@
       if (spinning) return; spinning = true; wheelHint && (wheelHint.textContent='');
       try{
         // 请求后端抽奖结果（返回中奖索引）
-        const r = await fetch(`${API}/wheel/spin`, { method:'POST' });
-        const data = r.ok ? await r.json() : { index: Math.floor(Math.random()*(wheelCfg.items?.length||8)) };
+        const initData = tg?.initData || '';
+        const r = await fetch(`${API}/wheel/spin`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ initData }) });
+        const data = await r.json().catch(()=>({ ok:false }));
+        if (!data.ok){
+          if (data.reason === 'POINTS_TOO_LOW'){
+            wheelHint && (wheelHint.textContent = `积分未达最低要求（需要 ${data.need}，当前 ${data.have}）`);
+          }else if (data.reason === 'POINTS_NOT_ENOUGH'){
+            wheelHint && (wheelHint.textContent = `积分不足（需要 ${data.need}，当前 ${data.have}）`);
+          }else{
+            wheelHint && (wheelHint.textContent = '抽奖失败，请稍后再试');
+          }
+          return;
+        }
         const index = Math.max(0, Math.min((wheelCfg.items?.length||8)-1, Number(data.index)||0));
         await spinTo(index);
-        const prize = wheelCfg.items?.[index]?.label || '未知奖品';
+        const prize = wheelCfg.items?.[index]?.label || data.prize || '未知奖品';
         wheelHint && (wheelHint.textContent = `恭喜，结果：${prize}`);
+        if (typeof data.points !== 'undefined'){
+          const kvPts = document.getElementById('kv-points');
+          if (kvPts) kvPts.textContent = String(data.points);
+        }
       }catch(err){ wheelHint && (wheelHint.textContent='抽奖失败，请稍后再试'); }
       finally{ spinning=false; }
     };

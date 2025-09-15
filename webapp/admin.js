@@ -9,6 +9,10 @@
   const preset60 = document.getElementById('preset-60');
   const preset90 = document.getElementById('preset-90');
   const tokenEl = document.getElementById('token');
+  // wheel config
+  const wheelLoadBtn = document.getElementById('wheel-load');
+  const wheelSaveBtn = document.getElementById('wheel-save');
+  const wheelJsonEl = document.getElementById('wheel-json');
   // donation
   const donUid = document.getElementById('don-uid');
   const donLoad = document.getElementById('don-load');
@@ -37,6 +41,9 @@
   const API_WAT_GET = origin + '/admin/watch/get';
   const API_WAT_SET = origin + '/admin/watch/set';
   const API_WAT_ADD = origin + '/admin/watch/add';
+  // wheel
+  const API_WHEEL_GET = origin + '/app/api/wheel/config';
+  const API_WHEEL_SET = origin + '/admin/wheel/config';
 
   function log(msg){
     if (!logEl) return;
@@ -84,6 +91,28 @@
 
   // 自动尝试读取（若已输入 token）
   if (tokenEl.value.trim()) load();
+
+  // wheel handlers
+  wheelLoadBtn?.addEventListener('click', async () => {
+    try{
+      const resp = await fetch(API_WHEEL_GET);
+      const data = await resp.json();
+      wheelJsonEl.value = JSON.stringify(data, null, 2);
+    }catch(e){ log('读取转盘配置异常：' + String(e)); alert('读取转盘配置异常'); }
+  });
+
+  wheelSaveBtn?.addEventListener('click', async () => {
+    const t = tokenEl.value.trim(); if (!t) return alert('先输入 Token');
+    let payload;
+    try{ payload = JSON.parse(wheelJsonEl.value || '{}'); }
+    catch(e){ return alert('JSON 不合法'); }
+    try{
+      const resp = await fetch(API_WHEEL_SET, { method:'POST', headers:{ 'Authorization': 'Bearer ' + t, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok){ log('保存转盘配置失败：' + JSON.stringify(data)); return alert('保存失败'); }
+      alert('已保存转盘配置');
+    }catch(e){ log('保存转盘配置异常：' + String(e)); alert('保存异常'); }
+  });
 
   // donation handlers
   donLoad?.addEventListener('click', async () => {

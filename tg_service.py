@@ -243,6 +243,22 @@ async def app_verify(request: Request):
                         pts = round(pts + donation_amt * 2.0, 2)
                 except Exception:
                     pts = pts
+                # 额外积分（正向奖励）与已消耗积分（扣减）覆盖层
+                extra_pts = 0.0
+                used_pts = 0.0
+                try:
+                    key_bonus = f"points_bonus:{ua.emby_user_id}"
+                    kv_bonus = db.query(Settings).filter(Settings.key == key_bonus).first()
+                    if kv_bonus and kv_bonus.value:
+                        extra_pts = float(kv_bonus.value)
+                    key_used = f"points_used:{ua.emby_user_id}"
+                    kv_used = db.query(Settings).filter(Settings.key == key_used).first()
+                    if kv_used and kv_used.value:
+                        used_pts = float(kv_used.value)
+                except Exception:
+                    extra_pts = extra_pts
+                    used_pts = used_pts
+
                 # 通知偏好
                 pref = db.query(UserPref).filter(UserPref.emby_user_id == ua.emby_user_id).first()
                 notify_enabled = not bool(pref and pref.notify_opt_out)
@@ -260,12 +276,15 @@ async def app_verify(request: Request):
                     "emby_user_id": ua.emby_user_id,
                     "expires_at": ua.expires_at.isoformat() if ua.expires_at else None,
                     "days_remaining": _compute_days_remaining(ua.expires_at),
-                    "points": pts,
+                    "points": round(max(0.0, pts + extra_pts - used_pts), 2),
                     "donation": donation_amt,
                     "notify_enabled": notify_enabled,
                     "entry_route": os.environ.get("EMBY_BASE_URL") or "",
                     "bound_route": bound_route,
                     "available_routes": AVAILABLE_ROUTES,
+                    "_points_base": pts,
+                    "_points_bonus": extra_pts,
+                    "_points_used": used_pts,
                 }
         finally:
             db.close()
@@ -432,21 +451,65 @@ async def set_wheel_config(request: Request):
 
 @app.post("/app/api/wheel/spin")
 async def wheel_spin(request: Request):
-    # 这里可以按需做 initData 校验和积分扣除；先返回结果索引
     body = {}
     try:
         body = await request.json()
     except Exception:
         body = {}
+    init_data = (body.get("initData") or "").strip()
+    verified = verify_webapp_initdata(init_data) if init_data else {"tg_id": None}
+    tg_id = verified.get("tg_id")
     db = SessionLocal()
     try:
         cfg = _get_wheel_config(db)
         items = cfg.get("items", [])
         n = len(items) or 8
+
+        # 找到用户并计算当前有效积分
+        ua = _get_account_by_tg_id(db, tg_id) if tg_id else None
+        if not ua:
+            raise HTTPException(401, "未绑定账户")
+        # 基础积分
+        pts_base = 0.0
+        donation_amt = 0.0
+        try:
+            ws = db.query(WatchStat).filter(WatchStat.emby_user_id == ua.emby_user_id).first()
+            if ws and ws.seconds_total is not None:
+                pts_base = round(float(ws.seconds_total) / 1800.0, 2)
+            ds = db.query(DonationStat).filter(DonationStat.emby_user_id == ua.emby_user_id).first()
+            if ds and ds.amount_total is not None:
+                donation_amt = float(ds.amount_total)
+                pts_base = round(pts_base + donation_amt * 2.0, 2)
+        except Exception:
+            pts_base = pts_base
+        # bonus/used 覆盖层
+        key_bonus = f"points_bonus:{ua.emby_user_id}"
+        kv_bonus = db.query(Settings).filter(Settings.key == key_bonus).first()
+        extra_pts = float(kv_bonus.value) if kv_bonus and kv_bonus.value else 0.0
+        key_used = f"points_used:{ua.emby_user_id}"
+        kv_used = db.query(Settings).filter(Settings.key == key_used).first()
+        used_pts = float(kv_used.value) if kv_used and kv_used.value else 0.0
+        current_points = round(max(0.0, pts_base + extra_pts - used_pts), 2)
+
+        min_points = int(cfg.get("min_points", 0))
+        cost_points = int(cfg.get("cost_points", 0))
+        if current_points < min_points:
+            return {"ok": False, "reason": "POINTS_TOO_LOW", "need": min_points, "have": current_points}
+        if current_points < cost_points:
+            return {"ok": False, "reason": "POINTS_NOT_ENOUGH", "need": cost_points, "have": current_points}
+
+        # 先扣参与消耗（记入 used）
+        used_pts_new = round(used_pts + cost_points, 2)
+        if kv_used is None:
+            kv_used = Settings(key=key_used, value=str(used_pts_new))
+        else:
+            kv_used.value = str(used_pts_new)
+        db.add(kv_used)
+        db.commit()
+
+        # 随机抽取
         weights = [max(0.0, float(it.get("weight", 1))) for it in items] if items else None
         if items and sum(weights) > 0:
-            # 加权随机
-            choices = list(range(n))
             rnd = random.random() * sum(weights)
             acc = 0.0
             pick = 0
@@ -457,8 +520,54 @@ async def wheel_spin(request: Request):
                     break
         else:
             pick = random.randint(0, n-1)
-        label = items[pick]["label"] if items and 0 <= pick < len(items) else f"ITEM {pick+1}"
-        return {"ok": True, "index": pick, "prize": label}
+        prize_label = items[pick]["label"] if items and 0 <= pick < len(items) else f"ITEM {pick+1}"
+
+        # 应用奖品
+        applied = {"bonus": 0.0, "used": 0.0, "days": 0}
+        try:
+            import re
+            m = re.search(r"([+-]?)(\d+)", prize_label)
+            if "积分" in prize_label and m:
+                sign = m.group(1) or "+"
+                val = int(m.group(2))
+                if sign == "-":
+                    # 负向：记入 used
+                    used_pts_new = round(used_pts_new + val, 2)
+                    kv_used.value = str(used_pts_new)
+                    db.add(kv_used)
+                    applied["used"] = val
+                else:
+                    # 正向：记入 bonus
+                    extra_pts_new = round(extra_pts + val, 2)
+                    if kv_bonus is None:
+                        kv_bonus = Settings(key=key_bonus, value=str(extra_pts_new))
+                    else:
+                        kv_bonus.value = str(extra_pts_new)
+                    db.add(kv_bonus)
+                    applied["bonus"] = val
+                db.commit()
+            elif "Premium" in prize_label or "天" in prize_label:
+                # 延期天数，匹配数字
+                import re
+                m2 = re.search(r"(\d+)", prize_label)
+                days = int(m2.group(1)) if m2 else 0
+                if days > 0:
+                    from datetime import datetime as dt, timedelta as td
+                    base = ua.expires_at or dt.utcnow()
+                    ua.expires_at = base + td(days=days)
+                    db.add(ua); db.commit()
+                    applied["days"] = days
+        except Exception:
+            pass
+
+        # 最新积分
+        kv_bonus = db.query(Settings).filter(Settings.key == key_bonus).first()
+        extra_pts = float(kv_bonus.value) if kv_bonus and kv_bonus.value else extra_pts
+        kv_used = db.query(Settings).filter(Settings.key == key_used).first()
+        used_pts = float(kv_used.value) if kv_used and kv_used.value else used_pts_new
+        new_points = round(max(0.0, pts_base + extra_pts - used_pts), 2)
+
+        return {"ok": True, "index": pick, "prize": prize_label, "points": new_points, "applied": applied}
     finally:
         db.close()
 
