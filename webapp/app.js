@@ -16,6 +16,19 @@
     tg.ready();
   }
 
+  // 检测 SF Symbols Web 字体加载完成，加载后隐藏 SVG 兜底
+  try{
+    if (document.fonts && document.fonts.load){
+      // 尝试加载一个常见符号字重
+      document.fonts.load('16px "SF Pro Icons"').then(()=>{
+        document.body.classList.add('sf-ready');
+      });
+    }else{
+      // 简单延时兜底
+      setTimeout(()=>document.body.classList.add('sf-ready'), 1200);
+    }
+  }catch(_){ setTimeout(()=>document.body.classList.add('sf-ready'), 1200); }
+
   // 轻量 Toast 提示
   function toast(msg){
     let t = document.getElementById('toast');
