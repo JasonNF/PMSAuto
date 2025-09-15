@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from emby_admin_models import SessionLocal, init_db, UserAccount, RenewalCode, AuditLog
+from emby_admin_models import SessionLocal, init_db, UserAccount, RenewalCode, AuditLog, Settings
 from log import logger
 from settings import EMBY_BASE_URL, EMBY_API_TOKEN, ADMIN_BEARER_TOKEN
 from scheduler import Scheduler
@@ -108,6 +108,20 @@ def emby_find_user_by_name(username: str) -> dict | None:
         logger.warning("find_user_by_name error: %s", e)
         return None
 
+
+def emby_get_user(user_id: str) -> dict | None:
+    """获取指定 Emby 用户，成功返回 JSON，否则返回 None。"""
+    try:
+        url = f"{EMBY_BASE_URL}/Users/{user_id}"
+        resp = requests.get(url, headers=HEADERS, params={"api_key": EMBY_API_TOKEN})
+        if resp.status_code == 200:
+            return resp.json()
+        logger.warning("Get user %s failed: %s %s", user_id, resp.status_code, resp.text)
+        return None
+    except Exception as e:
+        logger.warning("emby_get_user error: %s", e)
+        return None
+
 # ----- Schemas -----
 class RegisterReq(BaseModel):
     username: str
@@ -155,6 +169,42 @@ def expire_overdue_users():
             except Exception as e:
                 logger.error(f"Auto archive failed for {ua.emby_user_id}: {e}")
         db.commit()
+    finally:
+        db.close()
+
+
+# ----- Admin settings (default initial days) -----
+class SetDefaultDaysReq(BaseModel):
+    value: int
+
+@app.get("/admin/settings/default_days")
+def get_default_days():
+    db = SessionLocal()
+    try:
+        kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
+        v = 30
+        if kv and kv.value and str(kv.value).isdigit():
+            v = int(kv.value)
+        return {"default_initial_days": v}
+    finally:
+        db.close()
+
+@app.post("/admin/settings/default_days")
+def set_default_days(req: SetDefaultDaysReq):
+    if req.value < 0 or req.value > 3650:
+        raise HTTPException(400, "value should be between 0 and 3650")
+    db = SessionLocal()
+    try:
+        kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
+        if not kv:
+            kv = Settings(key="default_initial_days", value=str(req.value))
+            db.add(kv)
+        else:
+            kv.value = str(req.value)
+            db.add(kv)
+        db.add(AuditLog(action="set_default_days", detail=f"value={req.value}"))
+        db.commit()
+        return {"ok": True, "default_initial_days": req.value}
     finally:
         db.close()
 

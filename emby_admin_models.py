@@ -19,6 +19,13 @@ class UserAccount(Base):
     status = Column(String, default="active")  # active | archived
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class Settings(Base):
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, index=True, nullable=False)
+    value = Column(String, nullable=True)
     updated_at = Column(DateTime, onupdate=func.now(), default=func.now())
 
 class RenewalCode(Base):

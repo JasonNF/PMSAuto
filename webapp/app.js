@@ -16,6 +16,13 @@
   }
 
   let current = { verify: null, account: null };
+  let busy = false;
+
+  function setBusy(v){
+    busy = !!v;
+    const btns = [btnReg, btnPts, btnBindExisting, btnRedeem];
+    for (const b of btns){ if (b) b.disabled = busy; }
+  }
 
   function log(msg){
     if (!logEl) return;
@@ -34,11 +41,15 @@
       return null;
     }
     try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 10000);
       const resp = await fetch(`${API}/verify`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ initData }),
-      });
+        signal: controller.signal,
+      }).catch((e) => { throw e; });
+      clearTimeout(t);
       const text = await resp.text();
       let data;
       try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
@@ -97,8 +108,17 @@
 
   if (btnPts) {
     btnPts.onclick = async () => {
+      if (busy) return;
+      setBusy(true);
       log('刷新账户状态...');
-      await verifyInitData();
+      try {
+        await verifyInitData();
+        log('状态已刷新');
+      } catch (e) {
+        log('刷新异常：' + String(e));
+      } finally {
+        setBusy(false);
+      }
     };
   }
 
@@ -109,10 +129,12 @@
       if (choice && choice.trim()) {
         // 按用户名绑定
         try {
+          setBusy(true);
+          const days = prompt('可选：设置或顺延天数（正整数，留空不变）：');
           const resp = await fetch(`${API}/bind_by_name`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData, username: choice.trim() }),
+            body: JSON.stringify({ initData, username: choice.trim(), expires_days: days ? Number(days) : null }),
           });
           const text = await resp.text();
           let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
@@ -126,7 +148,7 @@
         } catch (e) {
           log('按用户名绑定异常：' + String(e));
           alert('绑定异常');
-        }
+        } finally { setBusy(false); }
         return;
       }
 
@@ -134,10 +156,12 @@
       const embyId = prompt('请输入已有 Emby 用户ID（如从管理后台复制）：');
       if (!embyId) return;
       try {
+        setBusy(true);
+        const days = prompt('可选：设置或顺延天数（正整数，留空不变）：');
         const resp = await fetch(`${API}/bind`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData, emby_user_id: embyId }),
+          body: JSON.stringify({ initData, emby_user_id: embyId, expires_days: days ? Number(days) : null }),
         });
         const text = await resp.text();
         let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
@@ -151,7 +175,7 @@
       } catch (e) {
         log('按ID绑定异常：' + String(e));
         alert('绑定异常');
-      }
+      } finally { setBusy(false); }
     };
   }
 

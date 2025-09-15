@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name
 
-from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Base, engine
+from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Settings, Base, engine
 from log import logger
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
@@ -46,6 +46,16 @@ def _startup_create_tables():
     """启动时自动创建缺失的数据表。"""
     try:
         Base.metadata.create_all(bind=engine)
+        # 初始化默认设置：默认初始天数 30
+        db = SessionLocal()
+        try:
+            kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
+            if not kv:
+                kv = Settings(key="default_initial_days", value="30")
+                db.add(kv)
+                db.commit()
+        finally:
+            db.close()
         logger.info("数据库表检查/创建完成")
     except Exception as e:
         # 不阻断启动，但打印错误便于排查
@@ -181,6 +191,16 @@ def _compute_days_remaining(expires_at) -> int | None:
     return max(0, ceil(delta.total_seconds() / 86400))
 
 
+def _get_default_initial_days(db) -> int:
+    try:
+        kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
+        if kv and kv.value and str(kv.value).isdigit():
+            return int(kv.value)
+    except Exception:
+        pass
+    return 30
+
+
 @app.post("/app/api/register")
 async def app_register(request: Request):
     if not TELEGRAM_BOT_TOKEN:
@@ -189,7 +209,7 @@ async def app_register(request: Request):
     init_data = body.get("initData") or ""
     username = (body.get("username") or "").strip()
     password = (body.get("password") or "").strip()
-    expires_days = body.get("expires_days")
+    # 不再让前端决定初始天数，由服务端设置
     if not username or not password:
         raise HTTPException(400, "username/password 必填")
     verified = verify_webapp_initdata(init_data)
@@ -204,8 +224,14 @@ async def app_register(request: Request):
     from datetime import timedelta, datetime as dt
     db = SessionLocal()
     try:
-        ua = UserAccount(emby_user_id=user_id, username=username, tg_id=str(tg_id), status="active",
-                        expires_at=(dt.utcnow() + timedelta(days=int(expires_days))) if expires_days else None)
+        default_days = _get_default_initial_days(db)
+        ua = UserAccount(
+            emby_user_id=user_id,
+            username=username,
+            tg_id=str(tg_id),
+            status="active",
+            expires_at=(dt.utcnow() + timedelta(days=default_days)) if default_days > 0 else None,
+        )
         db.add(ua)
         db.commit()
         return JSONResponse({"ok": True, "emby_user_id": user_id, "username": username})
@@ -218,6 +244,7 @@ async def app_bind_by_name(request: Request):
     body = await request.json()
     init_data = body.get("initData") or ""
     username = (body.get("username") or "").strip()
+    expires_days = body.get("expires_days")
     if not username:
         raise HTTPException(400, "username 必填")
     verified = verify_webapp_initdata(init_data)
@@ -242,6 +269,11 @@ async def app_bind_by_name(request: Request):
                 status="active",
             )
         ua.tg_id = str(tg_id)
+        # 如果还没有到期时间，按默认初始天数设置
+        if ua.expires_at is None:
+            from datetime import datetime as dt, timedelta as td
+            default_days = _get_default_initial_days(db)
+            ua.expires_at = (dt.utcnow() + td(days=default_days)) if default_days > 0 else None
         db.add(ua)
         db.commit()
         return {"ok": True}
@@ -253,6 +285,7 @@ async def app_bind(request: Request):
     body = await request.json()
     init_data = body.get("initData") or ""
     emby_user_id = (body.get("emby_user_id") or "").strip()
+    expires_days = body.get("expires_days")
     if not emby_user_id:
         raise HTTPException(400, "emby_user_id 必填")
     verified = verify_webapp_initdata(init_data)
@@ -265,6 +298,10 @@ async def app_bind(request: Request):
         if not ua:
             raise HTTPException(404, "用户不存在")
         ua.tg_id = str(tg_id)
+        if ua.expires_at is None:
+            from datetime import datetime as dt, timedelta as td
+            default_days = _get_default_initial_days(db)
+            ua.expires_at = (dt.utcnow() + td(days=default_days)) if default_days > 0 else None
         db.add(ua)
         db.commit()
         return {"ok": True}
