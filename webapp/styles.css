@@ -168,7 +168,8 @@ body.sf-ready .tab .svg-fallback{ display:none; }
 .badge-blue{ background: rgba(59,130,246,.10); color:#1d4ed8; border-color: rgba(59,130,246,.35); }
 
 /* 交流讨论卡片标题：居中且与 Emby 卡片字号一致 */
-.card.discuss .card-title{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:16px 12px; font-size:20px; font-weight:800; }
+.card.discuss .card-title{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:16px 12px; font-size:20px; font-weight:800; line-height:1; min-height: 48px; }
+.card.discuss .card-title .icon-svg{ width:22px; height:22px; display:inline-block; vertical-align:middle; }
 
 /* 轻量 Toast */
 #toast{ position: fixed; left:50%; bottom: 12%; transform: translateX(-50%); background: rgba(17,24,39,.92); color:#fff; padding:10px 14px; border-radius:10px; opacity:0; pointer-events:none; transition: opacity .2s ease; z-index:99; font-size:14px; }
