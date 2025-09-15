@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from emby_admin_models import SessionLocal, init_db, UserAccount, RenewalCode, AuditLog, Settings
+from emby_admin_models import SessionLocal, init_db, UserAccount, RenewalCode, AuditLog, Settings, DonationStat, WatchStat
 from log import logger
 from settings import EMBY_BASE_URL, EMBY_API_TOKEN, ADMIN_BEARER_TOKEN
 from scheduler import Scheduler
@@ -142,6 +142,14 @@ class CreateCodeReq(BaseModel):
 class RedeemCodeReq(BaseModel):
     code: str
 
+class WatchSetReq(BaseModel):
+    emby_user_id: str
+    seconds: int  # 非负整数
+
+class WatchAddReq(BaseModel):
+    emby_user_id: str
+    delta: int  # 可正可负
+
 # ----- Background tasks -----
 
 def expire_overdue_users():
@@ -205,6 +213,58 @@ def set_default_days(req: SetDefaultDaysReq):
         db.add(AuditLog(action="set_default_days", detail=f"value={req.value}"))
         db.commit()
         return {"ok": True, "default_initial_days": req.value}
+    finally:
+        db.close()
+
+# ----- Watch (seconds) Admin (manual) -----
+@app.get("/admin/watch/get")
+def watch_get(emby_user_id: str):
+    db = SessionLocal()
+    try:
+        ws = db.query(WatchStat).filter(WatchStat.emby_user_id == emby_user_id).first()
+        sec = int(ws.seconds_total) if ws and ws.seconds_total is not None else 0
+        return {"emby_user_id": emby_user_id, "seconds": sec}
+    finally:
+        db.close()
+
+@app.post("/admin/watch/set")
+def watch_set(req: WatchSetReq):
+    if not req.emby_user_id:
+        raise HTTPException(400, "emby_user_id 必填")
+    if not isinstance(req.seconds, int) or req.seconds < 0:
+        raise HTTPException(400, "seconds 应为非负整数")
+    db = SessionLocal()
+    try:
+        ws = db.query(WatchStat).filter(WatchStat.emby_user_id == req.emby_user_id).first()
+        if not ws:
+            ws = WatchStat(emby_user_id=req.emby_user_id, seconds_total=req.seconds)
+        else:
+            ws.seconds_total = req.seconds
+        db.add(ws)
+        db.add(AuditLog(action="watch_set", target=req.emby_user_id, detail=f"seconds={req.seconds}"))
+        db.commit()
+        return {"ok": True}
+    finally:
+        db.close()
+
+@app.post("/admin/watch/add")
+def watch_add(req: WatchAddReq):
+    if not req.emby_user_id:
+        raise HTTPException(400, "emby_user_id 必填")
+    if not isinstance(req.delta, int):
+        raise HTTPException(400, "delta 应为整数")
+    db = SessionLocal()
+    try:
+        ws = db.query(WatchStat).filter(WatchStat.emby_user_id == req.emby_user_id).first()
+        if not ws:
+            ws = WatchStat(emby_user_id=req.emby_user_id, seconds_total=0)
+        ws.seconds_total = int(ws.seconds_total or 0) + req.delta
+        if ws.seconds_total < 0:
+            ws.seconds_total = 0
+        db.add(ws)
+        db.add(AuditLog(action="watch_add", target=req.emby_user_id, detail=f"delta={req.delta}"))
+        db.commit()
+        return {"ok": True, "seconds": int(ws.seconds_total)}
     finally:
         db.close()
 

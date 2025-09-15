@@ -60,14 +60,25 @@
       }
       const v = data.verify || {};
       const acc = data.account || {};
-      current = { verify: v, account: acc };
-      const name = v.user?.username || v.user?.first_name || '未知用户';
-      if (acc.bound) {
-        const dr = acc.days_remaining != null ? `${acc.days_remaining} 天` : '未知';
-        setUserText(`已绑定：${name}（到期：${acc.expires_at || '未设置'}｜剩余：${dr}）`);
-      } else {
-        setUserText(`未绑定：${name}`);
-      }
+      current.verify = v;
+      current.account = acc;
+      const boundText = acc.bound ? `已绑定：${acc.username || '-'}（到期：${acc.expires_at || '未设置'}｜剩余：${acc.days_remaining ?? '未知'}）` : '未绑定';
+      setUserText(boundText);
+
+      // 详细字段填充
+      const kvBound = document.getElementById('kv-bound');
+      const kvUser = document.getElementById('kv-username');
+      const kvExp = document.getElementById('kv-exp');
+      const kvDays = document.getElementById('kv-days');
+      const kvPts = document.getElementById('kv-points');
+      const kvDon = document.getElementById('kv-donation');
+      if (kvBound) kvBound.textContent = acc.bound ? '已绑定' : '未绑定';
+      if (kvUser) kvUser.textContent = acc.username || '-';
+      if (kvExp) kvExp.textContent = acc.expires_at || '未设置';
+      if (kvDays) kvDays.textContent = (acc.days_remaining ?? '未知');
+      if (kvPts) kvPts.textContent = (typeof acc.points !== 'undefined' ? acc.points : 0).toString();
+      if (kvDon) kvDon.textContent = (typeof acc.donation !== 'undefined' ? acc.donation : 0).toString();
+
       return current;
     } catch (e) {
       setUserText('验证异常');
@@ -130,11 +141,10 @@
         // 按用户名绑定
         try {
           setBusy(true);
-          const days = prompt('可选：设置或顺延天数（正整数，留空不变）：');
           const resp = await fetch(`${API}/bind_by_name`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData, username: choice.trim(), expires_days: days ? Number(days) : null }),
+            body: JSON.stringify({ initData, username: choice.trim() }),
           });
           const text = await resp.text();
           let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
@@ -157,11 +167,10 @@
       if (!embyId) return;
       try {
         setBusy(true);
-        const days = prompt('可选：设置或顺延天数（正整数，留空不变）：');
         const resp = await fetch(`${API}/bind`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData, emby_user_id: embyId, expires_days: days ? Number(days) : null }),
+          body: JSON.stringify({ initData, emby_user_id: embyId }),
         });
         const text = await resp.text();
         let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }

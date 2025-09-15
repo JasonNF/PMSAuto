@@ -10,6 +10,15 @@ WEBAPP_URL = (EXTERNAL_BASE_URL.rstrip("/") + "/app") if EXTERNAL_BASE_URL else 
 bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 dp = Dispatcher()
 
+
+def build_open_keyboard(label: str = "Open", url: str = WEBAPP_URL) -> InlineKeyboardMarkup:
+    """构建一个包含单个“Open”按钮的内联键盘，点击后在 Telegram 内打开 MiniApp。
+    优先使用 WebApp 按钮，确保在聊天栏展示“Open”交互。
+    """
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=label, web_app=WebAppInfo(url=url))]]
+    )
+
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     # 解析 /start payload（深度链接携带的参数），形如 "/start abc123"
@@ -17,16 +26,7 @@ async def cmd_start(message: Message):
     parts = text.split(maxsplit=1)
     payload = parts[1] if len(parts) > 1 else None
 
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="打开 PMSAuto 应用",
-                    web_app=WebAppInfo(url=WEBAPP_URL)
-                )
-            ]
-        ]
-    )
+    kb = build_open_keyboard(label="打开 PMSAuto 应用", url=WEBAPP_URL)
 
     intro = [
         "欢迎使用 PMSAuto 机器人！",
@@ -68,3 +68,22 @@ async def cmd_register(message: Message):
         ]
     )
     await message.answer("请点击下方按钮打开 MiniApp 完成注册与绑定。", reply_markup=kb)
+
+
+@dp.message(Command("open"))
+async def cmd_open(message: Message):
+    """发送一个包含“Open”按钮的消息。支持 /open <可选文案|payload>。
+    - 文案：显示在消息正文，默认“打开 MiniApp”。
+    - payload：如需跳转到特定子页，可在 WEBAPP_URL 后自定义参数（前端根据哈希/查询参数处理）。
+    用法示例：/open 去个人信息页#home
+    """
+    text = (message.text or "").strip()
+    parts = text.split(maxsplit=1)
+    suffix = parts[1] if len(parts) > 1 else ""
+    body = suffix or "打开 MiniApp"
+    # 如果用户给了简单页签，如 #home / #admin，则拼到 URL；否则原样当成提示文案
+    url = WEBAPP_URL
+    if suffix.startswith("#") or suffix.startswith("?"):
+        url = f"{WEBAPP_URL}{suffix}"
+    kb = build_open_keyboard(label="Open", url=url)
+    await message.answer(body, reply_markup=kb)

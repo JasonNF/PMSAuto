@@ -11,17 +11,20 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 from aiogram.types import Update, BotCommand
-from bot.telegram_bot import bot, dp
+from bot.telegram_bot import bot, dp, build_open_keyboard
 from fastapi.middleware.cors import CORSMiddleware
 
 from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name
 
-from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Settings, Base, engine
+from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Settings, WatchStat, DonationStat, DailySnapshot, UserPref, Base, engine
 from log import logger
+from scheduler import Scheduler
+import asyncio
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 WEBHOOK_PATH = "/tg/webhook"
 EXTERNAL_BASE_URL = os.environ.get("EXTERNAL_BASE_URL") or ""
+ADMIN_BEARER_TOKEN = os.environ.get("EMBY_ADMIN_TOKEN") or os.environ.get("ADMIN_BEARER_TOKEN") or ""
 
 app = FastAPI(title="PMSAuto Unified Service", version="0.1.0")
 
@@ -60,6 +63,66 @@ def _startup_create_tables():
     except Exception as e:
         # 不阻断启动，但打印错误便于排查
         logger.error("数据库表创建失败: %s", e)
+    # 启动每日 00:01 定时任务
+    try:
+        scheduler = Scheduler()
+        scheduler.add_job(
+            _cron_daily_points_notify,
+            trigger="cron",
+            hour=0,
+            minute=1,
+            id="daily_points_notify",
+            replace_existing=True,
+        )
+        logger.info("每日积分变动通知任务已注册 (00:01)")
+    except Exception as e:
+        logger.warning("注册定时任务失败: %s", e)
+
+
+# ---- Admin Settings (Bearer 保护) ----
+def _check_admin_auth(request: Request):
+    token = ADMIN_BEARER_TOKEN.strip()
+    if not token:
+        return True  # 若未配置管理员令牌，则不强制鉴权（可按需改为 False）
+    auth = request.headers.get("authorization") or request.headers.get("Authorization")
+    return bool(auth and auth.startswith("Bearer ") and auth.split(" ", 1)[1] == token)
+
+
+@app.get("/admin/settings/default_days")
+async def admin_get_default_days(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    db = SessionLocal()
+    try:
+        return {"default_initial_days": _get_default_initial_days(db)}
+    finally:
+        db.close()
+
+
+@app.post("/admin/settings/default_days")
+async def admin_set_default_days(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    try:
+        value = int(body.get("value"))
+    except Exception:
+        raise HTTPException(400, "value 必须为整数")
+    if value < 0 or value > 3650:
+        raise HTTPException(400, "value 应在 0~3650 之间")
+    db = SessionLocal()
+    try:
+        kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
+        if not kv:
+            kv = Settings(key="default_initial_days", value=str(value))
+            db.add(kv)
+        else:
+            kv.value = str(value)
+            db.add(kv)
+        db.commit()
+        return {"ok": True, "default_initial_days": value}
+    finally:
+        db.close()
 
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
@@ -158,18 +221,37 @@ async def app_verify(request: Request):
     verified = verify_webapp_initdata(init_data)
     tg_id = verified.get("tg_id")
     # 查询绑定信息
-    info = {"bound": False, "username": None, "emby_user_id": None, "expires_at": None, "days_remaining": None}
+    info = {"bound": False, "username": None, "emby_user_id": None, "expires_at": None, "days_remaining": None, "points": 0.0, "donation": 0.0, "notify_enabled": True}
     if tg_id:
         db = SessionLocal()
         try:
             ua = db.query(UserAccount).filter(UserAccount.tg_id == tg_id).first()
             if ua:
+                # 计算积分：观看时长 / 1800 秒。保留两位小数。
+                pts = 0.0
+                donation_amt = 0.0
+                try:
+                    ws = db.query(WatchStat).filter(WatchStat.emby_user_id == ua.emby_user_id).first()
+                    if ws and ws.seconds_total is not None:
+                        pts = round(float(ws.seconds_total) / 1800.0, 2)
+                    ds = db.query(DonationStat).filter(DonationStat.emby_user_id == ua.emby_user_id).first()
+                    if ds and ds.amount_total is not None:
+                        donation_amt = float(ds.amount_total)
+                        pts = round(pts + donation_amt * 2.0, 2)
+                except Exception:
+                    pts = pts
+                # 通知偏好
+                pref = db.query(UserPref).filter(UserPref.emby_user_id == ua.emby_user_id).first()
+                notify_enabled = not bool(pref and pref.notify_opt_out)
                 info = {
                     "bound": True,
                     "username": ua.username,
                     "emby_user_id": ua.emby_user_id,
                     "expires_at": ua.expires_at.isoformat() if ua.expires_at else None,
                     "days_remaining": _compute_days_remaining(ua.expires_at),
+                    "points": pts,
+                    "donation": donation_amt,
+                    "notify_enabled": notify_enabled,
                 }
         finally:
             db.close()
@@ -199,6 +281,198 @@ def _get_default_initial_days(db) -> int:
     except Exception:
         pass
     return 30
+
+
+def _local_datestr(dt_obj: datetime | None = None) -> str:
+    dt_obj = dt_obj or datetime.now()
+    return dt_obj.strftime("%Y-%m-%d")
+
+
+async def _send_daily_points_to_all():
+    if bot is None:
+        return
+    db = SessionLocal()
+    try:
+        # 取所有已绑定且激活的用户
+        users = db.query(UserAccount).filter(UserAccount.tg_id != None, UserAccount.status == "active").all()
+        today = datetime.now()
+        yday = today - timedelta(days=1)
+        d_today = _local_datestr(today)
+        d_yday = _local_datestr(yday)
+        for ua in users:
+            # 当前总计
+            ws = db.query(WatchStat).filter(WatchStat.emby_user_id == ua.emby_user_id).first()
+            ds = db.query(DonationStat).filter(DonationStat.emby_user_id == ua.emby_user_id).first()
+            sec_total = int(ws.seconds_total) if ws and ws.seconds_total is not None else 0
+            don_total = int(ds.amount_total) if ds and ds.amount_total is not None else 0
+
+            # 今日快照（存储当前总计）
+            snap_today = (
+                db.query(DailySnapshot)
+                .filter(DailySnapshot.emby_user_id == ua.emby_user_id, DailySnapshot.date == d_today)
+                .first()
+            )
+            if not snap_today:
+                snap_today = DailySnapshot(
+                    emby_user_id=ua.emby_user_id,
+                    date=d_today,
+                    seconds_total=sec_total,
+                    donation_total=don_total,
+                )
+            else:
+                snap_today.seconds_total = sec_total
+                snap_today.donation_total = don_total
+            db.add(snap_today)
+
+            # 昨日快照（用于计算增量），不存在则按0处理
+            snap_yday = (
+                db.query(DailySnapshot)
+                .filter(DailySnapshot.emby_user_id == ua.emby_user_id, DailySnapshot.date == d_yday)
+                .first()
+            )
+            y_sec = int(snap_yday.seconds_total) if snap_yday and snap_yday.seconds_total is not None else 0
+            y_don = int(snap_yday.donation_total) if snap_yday and snap_yday.donation_total is not None else 0
+
+            # 计算增量
+            delta_sec = max(0, sec_total - y_sec)
+            delta_don = max(0, don_total - y_don)
+            delta_hours = round(delta_sec / 3600.0, 2)
+            delta_pts_watch = round(delta_sec / 1800.0, 2)
+            delta_pts_don = round(delta_don * 2.0, 2)
+            delta_pts = round(delta_pts_watch + delta_pts_don, 2)
+
+            # 通知开关：若用户关闭或无任何增量，则跳过
+            pref = db.query(UserPref).filter(UserPref.emby_user_id == ua.emby_user_id).first()
+            if (pref and pref.notify_opt_out) or (delta_sec == 0 and delta_don == 0):
+                continue
+
+            # 当前总积分/总时长
+            total_pts = round(sec_total / 1800.0 + don_total * 2.0, 2)
+            total_hours = round(sec_total / 3600.0, 2)
+
+            # 组装消息（贴近示例样式）
+            lines = [
+                "Emby 观看积分更新通知",
+                "====================",
+                "",
+                f"新增观看时长：{delta_hours} 小时",
+                f"新增观看积分：{delta_pts_watch}",
+                f"捐赠积分增加：{delta_pts_don}",
+                f"Premium 流量使用情况：0.0 GB",
+                f"超出每日流量限额：0 GB",
+                f"流量消耗积分：0",
+                "",
+                f"积分变化：{delta_pts}",
+                "",
+                "--------------------",
+                "",
+                f"当前总积分：{total_pts}",
+                f"当前总观看时长：{total_hours} 小时",
+                "",
+                "====================",
+            ]
+            text = "\n".join(lines)
+
+            # 发送带 Open 按钮的消息
+            from bot.telegram_bot import WEBAPP_URL
+            url = WEBAPP_URL + "#home"
+            kb = build_open_keyboard(label="Open", url=url)
+            try:
+                await bot.send_message(chat_id=ua.tg_id, text=text, reply_markup=kb)
+            except Exception as e:
+                logger.warning("发送每日通知失败 tg_id=%s: %s", ua.tg_id, e)
+
+        db.commit()
+    finally:
+        db.close()
+
+
+def _cron_daily_points_notify():
+    """在调度线程中触发 async 发送逻辑。"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    try:
+        fut = asyncio.run_coroutine_threadsafe(_send_daily_points_to_all(), loop)
+        fut.result(timeout=60)
+    except Exception as e:
+        logger.warning("触发每日通知失败: %s", e)
+
+
+@app.post("/admin/notify")
+async def admin_notify(request: Request):
+    """向指定 tg_id 发送一条包含 WebApp “Open” 按钮的通知消息。
+    受 Bearer 鉴权保护。参数：
+    - tg_id: Telegram 用户ID（字符串）
+    - text: 通知文案，例如 "Plex 观看积分更新通知"
+    - suffix: 可选，形如 "#home" 或 "#admin" 或 "?from=notify"，会拼接到 WEBAPP_URL 后
+    """
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    if bot is None:
+        raise HTTPException(500, "Bot 未初始化")
+    body = await request.json()
+    tg_id = str(body.get("tg_id") or "").strip()
+    text = (body.get("text") or "").strip() or "打开 MiniApp"
+    suffix = (body.get("suffix") or "").strip()
+    if not tg_id:
+        raise HTTPException(400, "tg_id 必填")
+    # 组装 URL：如果 suffix 以 # 或 ? 开头则拼接至 MiniApp URL，由端内前端处理
+    from bot.telegram_bot import WEBAPP_URL
+    url = WEBAPP_URL + suffix if (suffix.startswith("#") or suffix.startswith("?")) else WEBAPP_URL
+    kb = build_open_keyboard(label="Open", url=url)
+    try:
+        await bot.send_message(chat_id=tg_id, text=text, reply_markup=kb)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(500, f"发送失败: {e}")
+
+
+@app.get("/app/api/notify_pref")
+async def app_get_notify_pref(request: Request):
+    body = await request.json() if request.method == "POST" else {}
+    init_data = body.get("initData") or (await request.body()).decode("utf-8") if body == {} else body.get("initData")
+    # 兼容 GET 无 body 的情况，不强制
+    verified = verify_webapp_initdata(init_data) if init_data else {"tg_id": None}
+    tg_id = verified.get("tg_id")
+    db = SessionLocal()
+    try:
+        ua = _get_account_by_tg_id(db, tg_id) if tg_id else None
+        if not ua:
+            return {"ok": True, "enabled": True}
+        pref = db.query(UserPref).filter(UserPref.emby_user_id == ua.emby_user_id).first()
+        enabled = not bool(pref and pref.notify_opt_out)
+        return {"ok": True, "enabled": enabled}
+    finally:
+        db.close()
+
+
+@app.post("/app/api/notify_pref")
+async def app_set_notify_pref(request: Request):
+    body = await request.json()
+    init_data = body.get("initData") or ""
+    enabled = bool(body.get("enabled", True))
+    verified = verify_webapp_initdata(init_data)
+    tg_id = verified.get("tg_id")
+    if not tg_id:
+        raise HTTPException(400, "未获取到 Telegram 用户")
+    db = SessionLocal()
+    try:
+        ua = _get_account_by_tg_id(db, tg_id)
+        if not ua:
+            raise HTTPException(404, "未绑定账户")
+        pref = db.query(UserPref).filter(UserPref.emby_user_id == ua.emby_user_id).first()
+        if not pref:
+            pref = UserPref(emby_user_id=ua.emby_user_id, notify_opt_out=not enabled)
+        else:
+            pref.notify_opt_out = not enabled
+        db.add(pref)
+        db.commit()
+        return {"ok": True, "enabled": enabled}
+    finally:
+        db.close()
 
 
 @app.post("/app/api/register")

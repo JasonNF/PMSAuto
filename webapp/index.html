@@ -3,22 +3,149 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PMSAuto MiniApp</title>
+  <title>PMSAuto 用户中心</title>
   <link rel="stylesheet" href="/app/styles.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>PMSAuto</h1>
-    <div id="user"></div>
-    <div class="actions">
-      <button id="btn-register">注册 / 绑定</button>
-      <button id="btn-bind-existing">绑定已有账号</button>
-      <button id="btn-points">刷新积分</button>
-      <button id="btn-redeem">兑换码</button>
-    </div>
-    <pre id="log"></pre>
+  <header class="app-bar">
+    <div class="title">PMSAuto 用户中心</div>
+    <div class="menu">⋮</div>
+  </header>
+
+  <main id="pages">
+    <!-- 首页：个人信息 -->
+    <section class="page active" id="page-home">
+      <div class="hero-card">
+        <h2>PMSAuto 用户中心</h2>
+        <p>账户信息与服务管理</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title with-icon">
+          <span class="icon">👤</span>
+          <span>个人信息</span>
+        </div>
+        <div class="kv">
+          <div><span class="k">绑定状态：</span><span class="v" id="kv-bound">-</span></div>
+          <div><span class="k">账号：</span><span class="v" id="kv-username">-</span></div>
+          <div><span class="k">到期时间：</span><span class="v" id="kv-exp">-</span></div>
+          <div><span class="k">剩余天数：</span><span class="v" id="kv-days">-</span></div>
+          <div><span class="k">可用积分：</span><span class="v" id="kv-points">0</span></div>
+          <div><span class="k">捐赠金额：</span><span class="v" id="kv-donation">0</span></div>
+        </div>
+        <div class="card-actions row">
+          <button class="btn" id="btn-register">注册 / 绑定</button>
+          <button class="btn" id="btn-bind-existing">绑定已有账号</button>
+          <button class="btn" id="btn-points">刷新状态</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title with-icon">
+          <span class="icon">🧿</span>
+          <span>Emby 账户</span>
+        </div>
+        <div class="kv">
+          <div><span class="k">用户名：</span><span class="v" id="emby-username">-</span></div>
+          <div><span class="k">破壳日：</span><span class="v" id="emby-exp">-</span></div>
+          <div><span class="k">观看等级：</span><span class="v">☆</span></div>
+          <div><span class="k">资料库权限：</span><span class="v">全部</span></div>
+        </div>
+        <div class="card-actions">
+          <button class="btn" id="btn-redeem">兑换码</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title with-icon">
+          <span class="icon">💬</span>
+          <span>交流讨论</span>
+        </div>
+        <div class="list">
+          <div class="list-item">
+            <div>
+              <div class="li-title">用户交流群</div>
+              <div class="li-sub">随便聊聊</div>
+            </div>
+            <div class="li-actions">
+              <button class="btn ghost" data-copy="https://t.me/your_group">复制</button>
+              <a class="btn primary" href="https://t.me/your_group" target="_blank">进入</a>
+            </div>
+          </div>
+          <div class="list-item">
+            <div>
+              <div class="li-title">官方通知频道</div>
+              <div class="li-sub">获取最新服务公告和更新</div>
+            </div>
+            <div class="li-actions">
+              <button class="btn ghost" data-copy="https://t.me/your_channel">复制</button>
+              <a class="btn primary" href="https://t.me/your_channel" target="_blank">进入</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 活动页（占位） -->
+    <section class="page" id="page-activity">
+      <div class="hero-card">
+        <h2>活动专区</h2>
+        <p>转盘、竞拍等互动活动</p>
+      </div>
+      <div class="card">
+        <div class="card-title with-icon"><span class="icon">🎡</span><span>幸运大转盘</span></div>
+        <p>最低积分要求：30 ｜ 参与消耗：5</p>
+        <button class="btn primary" disabled>敬请期待</button>
+      </div>
+      <div class="card">
+        <div class="card-title with-icon"><span class="icon">🔨</span><span>竞拍活动</span></div>
+        <p>最低积分要求：10 ｜ 可免费参与</p>
+        <button class="btn primary" disabled>敬请期待</button>
+      </div>
+    </section>
+
+    <!-- 管理页（占位，引导到 /app/admin.html） -->
+    <section class="page" id="page-admin">
+      <div class="hero-card">
+        <h2>管理中心</h2>
+        <p>系统管理与配置</p>
+      </div>
+      <div class="card">
+        <div class="card-title with-icon"><span class="icon">⚙️</span><span>系统设置项</span></div>
+        <p>打开管理员页面以调整默认初始天数等配置。</p>
+        <a class="btn" href="/app/admin.html" target="_blank">打开管理员页面</a>
+      </div>
+    </section>
+
+    <!-- 排行榜（占位） -->
+    <section class="page" id="page-rank">
+      <div class="hero-card"><h2>排行榜</h2><p>积分、捐赠与观看时长排名</p></div>
+      <div class="card"><div class="card-title">积分榜</div><p>敬请期待</p></div>
+    </section>
+  </main>
+
+  <!-- 底部导航 -->
+  <nav class="tabbar">
+    <button class="tab active" data-tab="home">个人信息</button>
+    <button class="tab" data-tab="activity">活动</button>
+    <button class="fab" id="fab">＋</button>
+    <button class="tab" data-tab="admin">管理</button>
+    <button class="tab" data-tab="rank">排行榜</button>
+  </nav>
+
+  <!-- FAB 扩展菜单 -->
+  <div class="fab-menu" id="fab-menu">
+    <button class="fab-item" id="fab-redeem">兑换邀请码</button>
+    <button class="fab-item" id="fab-bind">绑定媒体账号</button>
+    <button class="fab-item" id="fab-bind-line">绑定线路</button>
+    <button class="fab-close" id="fab-close">×</button>
   </div>
-  <script src="/app/app.js?v=20250915-01"></script>
+
+  <footer class="app-footer">@PMSAuto_Bot</footer>
+
+  <pre id="log" class="log"></pre>
+
+  <script src="/app/app.js?v=20250915-02"></script>
 </body>
 </html>

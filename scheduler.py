@@ -2,6 +2,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils import Singleton
+from zoneinfo import ZoneInfo
 
 
 class Scheduler(metaclass=Singleton):
@@ -11,7 +12,9 @@ class Scheduler(metaclass=Singleton):
         }
         self.executors = {"default": ThreadPoolExecutor(100)}
         self.scheduler = BackgroundScheduler(
-            jobstores=self.jobstores, executors=self.executors
+            jobstores=self.jobstores,
+            executors=self.executors,
+            timezone=ZoneInfo("Asia/Shanghai"),
         )
 
         self.start()

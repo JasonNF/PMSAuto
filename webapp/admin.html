@@ -18,11 +18,48 @@
 
     <div class="card">
       <div style="margin-bottom:8px;">当前默认初始天数：<b id="current">-</b></div>
-      <div style="display:flex; gap:8px; align-items:center;">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:6px;">
+          <input id="days-enable" type="checkbox" checked /> 启用默认注册时长
+        </label>
         <input id="days" type="number" min="0" max="3650" placeholder="新的默认天数，例如 30" />
+        <button id="preset-30">30天</button>
+        <button id="preset-60">60天</button>
+        <button id="preset-90">90天</button>
         <button id="btn-load">读取</button>
         <button id="btn-save">保存</button>
       </div>
+      <small>关闭“启用默认注册时长”将把默认值设为 0（即注册/绑定时不设置到期时间）。</small>
+    </div>
+
+    <div class="card">
+      <h3>捐赠管理</h3>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="don-uid" placeholder="emby_user_id" style="flex:2" />
+        <button id="don-load">读取捐赠</button>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+        <input id="don-set" type="number" placeholder="设置捐赠总额（整数）" />
+        <button id="don-save">保存设置</button>
+        <input id="don-add" type="number" placeholder="增量（可正可负）" />
+        <button id="don-apply">增量调整</button>
+      </div>
+      <div>当前捐赠金额：<b id="don-cur">-</b></div>
+    </div>
+
+    <div class="card">
+      <h3>观看时长管理</h3>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="wat-uid" placeholder="emby_user_id" style="flex:2" />
+        <button id="wat-load">读取时长</button>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+        <input id="wat-set" type="number" placeholder="设置总秒数（非负整数）" />
+        <button id="wat-save">保存设置</button>
+        <input id="wat-add" type="number" placeholder="增量秒数（可正可负）" />
+        <button id="wat-apply">增量调整</button>
+      </div>
+      <div>当前累计秒数：<b id="wat-cur">-</b>（积分贡献 = 秒数/1800）</div>
     </div>
 
     <pre id="log"></pre>
