@@ -155,3 +155,6 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 /* 选中态高亮（蓝色描边） */
 .route-item.selected{ box-shadow: 0 0 0 2px rgba(59,130,246,.9) inset, 0 1px 0 rgba(0,0,0,.05); }
 .badge-blue{ background: rgba(59,130,246,.10); color:#1d4ed8; border-color: rgba(59,130,246,.35); }
+
+/* 交流讨论卡片标题：居中且与 Emby 卡片字号一致 */
+.card.discuss .card-title{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:16px 12px; font-size:20px; font-weight:800; }
