@@ -68,3 +68,20 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .app-footer{ text-align:center; color:#eaeaff; opacity:.8; padding: 10px 0 84px; }
 
 .log{ background: rgba(0,0,0,.35); color:#fff; max-width:720px; margin: 8px auto; padding: 8px 12px; border-radius: 8px; white-space: pre-wrap; }
+
+/* 个人信息卡片定制样式 */
+.card.profile{ padding:0; overflow:hidden; }
+.card.profile .card-title{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  margin:0; padding:16px 12px;
+  font-size: 20px;                 /* 标题加大一号 */
+  text-align:center; font-weight:800;
+  background: linear-gradient(180deg, rgba(124,58,237,.15), rgba(124,58,237,.04)); /* 表头加深 */
+  border-bottom: 1px solid rgba(15,23,42,.08);
+}
+.card.profile .with-icon .icon{ margin-right:0; }
+.card.profile .kv{ padding: 12px 14px; }
+.card.profile .kv > div{ display:flex; align-items:center; justify-content:space-between; padding:10px 2px; border-bottom: 1px solid rgba(15,23,42,.06); }
+.card.profile .kv > div:last-child{ border-bottom:0; }
+.card.profile .kv .k{ min-width:auto; }
+.card.profile .kv .v{ font-weight: 400; } /* 内容不加粗 */
