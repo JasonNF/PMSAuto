@@ -16,6 +16,13 @@
     tg.ready();
   }
 
+  // 简单日期格式化：仅保留 YYYY-MM-DD
+  function fmtDateDay(s){
+    if (!s || typeof s !== 'string') return '';
+    const i = s.indexOf('T');
+    return (i > 0 ? s.slice(0, i) : s).slice(0, 10);
+  }
+
   // 检测 SF Symbols Web 字体加载完成，加载后隐藏 SVG 兜底
   try{
     if (document.fonts && document.fonts.load){
@@ -336,18 +343,26 @@
       const acc = data.account || {};
       current.verify = v;
       current.account = acc;
-      const boundText = acc.bound ? `已绑定：${acc.username || '-'}（到期：${acc.expires_at || '未设置'}｜剩余：${acc.days_remaining ?? '未知'}）` : '未绑定';
+      const boundText = acc.bound ? `已绑定：${acc.username || '-'}（到期：${fmtDateDay(acc.expires_at) || '未设置'}｜剩余：${acc.days_remaining ?? '未知'}）` : '未绑定';
       setUserText(boundText);
 
-      // 详细字段填充
+      // 详细字段填充（个人信息卡片）
       const kvBound = document.getElementById('kv-bound');
       const kvExp = document.getElementById('kv-exp');
       const kvPts = document.getElementById('kv-points');
       const kvDon = document.getElementById('kv-donation');
       if (kvBound) kvBound.textContent = acc.bound ? '已绑定' : '未绑定';
-      if (kvExp) kvExp.textContent = acc.expires_at || '未设置';
+      if (kvExp) kvExp.textContent = fmtDateDay(acc.expires_at) || '未设置';
       if (kvPts) kvPts.textContent = (typeof acc.points !== 'undefined' ? acc.points : 0).toString();
       if (kvDon) kvDon.textContent = (typeof acc.donation !== 'undefined' ? acc.donation : 0).toString();
+
+      // Emby 账户区块字段填充
+      const embyUserEl = document.getElementById('emby-username');
+      const embyCreatedEl = document.getElementById('emby-created');
+      const embyLevelEl = document.getElementById('emby-level');
+      if (embyUserEl) embyUserEl.textContent = acc.username || '-';
+      if (embyCreatedEl) embyCreatedEl.textContent = fmtDateDay(acc.created_at) || '-';
+      if (embyLevelEl) embyLevelEl.textContent = acc.watch_level || '☆';
 
       // Emby 线路信息填充
       const elEntry = document.getElementById('emby-entry');

@@ -237,12 +237,16 @@ async def app_verify(request: Request):
                     ws = db.query(WatchStat).filter(WatchStat.emby_user_id == ua.emby_user_id).first()
                     if ws and ws.seconds_total is not None:
                         pts = round(float(ws.seconds_total) / 1800.0, 2)
+                        watch_hours = round(float(ws.seconds_total) / 3600.0, 2)
+                    else:
+                        watch_hours = 0.0
                     ds = db.query(DonationStat).filter(DonationStat.emby_user_id == ua.emby_user_id).first()
                     if ds and ds.amount_total is not None:
                         donation_amt = float(ds.amount_total)
                         pts = round(pts + donation_amt * 2.0, 2)
                 except Exception:
                     pts = pts
+                    watch_hours = 0.0
                 # 额外积分（正向奖励）与已消耗积分（扣减）覆盖层
                 extra_pts = 0.0
                 used_pts = 0.0
@@ -270,13 +274,25 @@ async def app_verify(request: Request):
                 except Exception:
                     bound_route = None
 
+                # 观看等级（按累计小时数简单分级）
+                def _watch_level(hours: float) -> str:
+                    if hours >= 500: return "★★★★★"
+                    if hours >= 200: return "★★★★"
+                    if hours >= 50: return "★★★"
+                    if hours >= 10: return "★★"
+                    if hours > 0: return "★"
+                    return "☆"
+
                 info = {
                     "bound": True,
                     "username": ua.username,
                     "emby_user_id": ua.emby_user_id,
+                    "created_at": ua.created_at.isoformat() if ua.created_at else None,
                     "expires_at": ua.expires_at.isoformat() if ua.expires_at else None,
                     "days_remaining": _compute_days_remaining(ua.expires_at),
                     "points": round(max(0.0, pts + extra_pts - used_pts), 2),
+                    "watch_hours": watch_hours,
+                    "watch_level": _watch_level(watch_hours),
                     "donation": donation_amt,
                     "notify_enabled": notify_enabled,
                     "entry_route": os.environ.get("EMBY_BASE_URL") or "",
