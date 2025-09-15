@@ -87,10 +87,11 @@ def verify_webapp_initdata(init_data: str) -> dict:
     # 构建 data_check_string
     data_check_arr = [f"{k}={v}" for k, v in sorted(params.items())]
     data_check_string = "\n".join(data_check_arr)
-    # 计算 secret key: HMAC_SHA256("WebAppData", bot_token)
+    # 计算 secret key（Telegram 文档）: secret_key = HMAC_SHA256(key=b"WebAppData", msg=bot_token)
+    # 注意：key 与 msg 的顺序不要颠倒
     secret_key = hmac.new(
-        key=TELEGRAM_BOT_TOKEN.encode("utf-8"),
-        msg=b"WebAppData",
+        key=b"WebAppData",
+        msg=TELEGRAM_BOT_TOKEN.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).digest()
     # 计算校验哈希
