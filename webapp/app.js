@@ -16,6 +16,42 @@
     tg.ready();
   }
 
+  // 轻量 Toast 提示
+  function toast(msg){
+    let t = document.getElementById('toast');
+    if (!t){
+      t = document.createElement('div');
+      t.id = 'toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1600);
+  }
+
+  // 复制按钮（使用事件委托）
+  document.addEventListener('click', async (e) => {
+    const target = e.target;
+    if (target && target.matches('button[data-copy]')){
+      const text = target.getAttribute('data-copy') || '';
+      try{
+        await navigator.clipboard.writeText(text);
+        toast('已复制到剪贴板');
+      }catch(err){
+        // 回退：创建临时输入
+        try{
+          const inp = document.createElement('input');
+          inp.value = text;
+          document.body.appendChild(inp);
+          inp.select();
+          document.execCommand('copy');
+          document.body.removeChild(inp);
+          toast('已复制到剪贴板');
+        }catch(_){ toast('复制失败'); }
+      }
+    }
+  });
+
   // 点击“绑定线路”徽章即可选择线路
   const boundEl = document.getElementById('emby-bound');
   if (boundEl) {

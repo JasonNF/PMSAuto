@@ -158,3 +158,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 
 /* 交流讨论卡片标题：居中且与 Emby 卡片字号一致 */
 .card.discuss .card-title{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:16px 12px; font-size:20px; font-weight:800; }
+
+/* 轻量 Toast */
+#toast{ position: fixed; left:50%; bottom: 12%; transform: translateX(-50%); background: rgba(17,24,39,.92); color:#fff; padding:10px 14px; border-radius:10px; opacity:0; pointer-events:none; transition: opacity .2s ease; z-index:99; font-size:14px; }
+#toast.show{ opacity:1; }
