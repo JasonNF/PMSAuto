@@ -231,12 +231,11 @@
       if (!username) return;
       const password = prompt('请输入密码：');
       if (!password) return;
-      const expires = prompt('可选：初始天数（空则不设置）：');
       try {
         const resp = await fetch(`${API}/register`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ initData, username, password, expires_days: expires || null }),
+          body: JSON.stringify({ initData, username, password }),
         });
         const text = await resp.text();
         let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
