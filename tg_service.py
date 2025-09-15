@@ -14,7 +14,7 @@ from aiogram.types import Update, BotCommand
 from bot.telegram_bot import bot, dp
 from fastapi.middleware.cors import CORSMiddleware
 
-from emby_admin_service import emby_create_user, emby_set_password
+from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name
 
 from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Base, engine
 from log import logger
@@ -212,6 +212,41 @@ async def app_register(request: Request):
     finally:
         db.close()
 
+
+@app.post("/app/api/bind_by_name")
+async def app_bind_by_name(request: Request):
+    body = await request.json()
+    init_data = body.get("initData") or ""
+    username = (body.get("username") or "").strip()
+    if not username:
+        raise HTTPException(400, "username 必填")
+    verified = verify_webapp_initdata(init_data)
+    tg_id = verified.get("tg_id")
+    if not tg_id:
+        raise HTTPException(400, "未获取到 Telegram 用户")
+    # 查 Emby 是否存在该用户名
+    info = emby_find_user_by_name(username)
+    if not info:
+        raise HTTPException(404, "User not found")
+    emby_user_id = info.get("Id")
+    if not emby_user_id:
+        raise HTTPException(500, "Emby 响应缺少用户Id")
+    # 绑定到本地账户（若不存在则创建一条本地记录）
+    db = SessionLocal()
+    try:
+        ua = db.query(UserAccount).filter(UserAccount.emby_user_id == emby_user_id).first()
+        if not ua:
+            ua = UserAccount(
+                emby_user_id=emby_user_id,
+                username=username,
+                status="active",
+            )
+        ua.tg_id = str(tg_id)
+        db.add(ua)
+        db.commit()
+        return {"ok": True}
+    finally:
+        db.close()
 
 @app.post("/app/api/bind")
 async def app_bind(request: Request):

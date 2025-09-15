@@ -105,6 +105,32 @@
   if (btnBindExisting) {
     btnBindExisting.onclick = async () => {
       const initData = tg?.initData || '';
+      const choice = prompt('输入已有账号的“用户名”，或留空改为使用用户ID绑定：');
+      if (choice && choice.trim()) {
+        // 按用户名绑定
+        try {
+          const resp = await fetch(`${API}/bind_by_name`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData, username: choice.trim() }),
+          });
+          const text = await resp.text();
+          let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
+          if (!data.ok) {
+            log('按用户名绑定失败：' + JSON.stringify(data));
+            alert('按用户名绑定失败，请检查用户名是否存在');
+            return;
+          }
+          alert('绑定成功');
+          await verifyInitData();
+        } catch (e) {
+          log('按用户名绑定异常：' + String(e));
+          alert('绑定异常');
+        }
+        return;
+      }
+
+      // 按 ID 绑定
       const embyId = prompt('请输入已有 Emby 用户ID（如从管理后台复制）：');
       if (!embyId) return;
       try {
@@ -116,14 +142,14 @@
         const text = await resp.text();
         let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
         if (!data.ok) {
-          log('绑定失败：' + JSON.stringify(data));
-          alert('绑定失败，请确认用户ID是否正确');
+          log('按ID绑定失败：' + JSON.stringify(data));
+          alert('按ID绑定失败，请确认用户ID是否正确');
           return;
         }
         alert('绑定成功');
         await verifyInitData();
       } catch (e) {
-        log('绑定异常：' + String(e));
+        log('按ID绑定异常：' + String(e));
         alert('绑定异常');
       }
     };
