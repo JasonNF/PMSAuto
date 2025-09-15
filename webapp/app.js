@@ -39,9 +39,11 @@
           const tags = (tagsRaw || '').split(',').map(t => t.trim()).filter(Boolean);
           return { host: host.trim(), tags };
         };
+        const currentBound = (current.account?.bound_route || '').trim();
         options.map(parse).forEach((item) => {
           const li = document.createElement('div');
           li.className = 'route-item';
+          if (item.host === currentBound) li.classList.add('selected');
           li.innerHTML = `
             <div class="route-host">${item.host}</div>
             <div class="route-tags">${item.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
@@ -56,6 +58,12 @@
               let j2; try { j2 = JSON.parse(t2); } catch(_) { j2 = { ok:false, raw:t2 }; }
               if (!j2.ok) { alert('绑定失败'); log('绑定线路失败: ' + t2); return; }
               modal.classList.remove('show');
+              // 立即更新徽章视觉
+              const elBoundNow = document.getElementById('emby-bound');
+              if (elBoundNow) {
+                elBoundNow.textContent = item.host;
+                elBoundNow.classList.add('badge-blue');
+              }
               await verifyInitData();
             } catch (e) {
               log('绑定异常：' + String(e));
@@ -147,7 +155,11 @@
       const elEntry = document.getElementById('emby-entry');
       const elBound = document.getElementById('emby-bound');
       if (elEntry) elEntry.textContent = (acc.entry_route || '-');
-      if (elBound) elBound.textContent = (acc.bound_route || '未设置');
+      if (elBound) {
+        const has = !!acc.bound_route;
+        elBound.textContent = (acc.bound_route || '未设置');
+        elBound.classList.toggle('badge-blue', has);
+      }
 
       return current;
     } catch (e) {
