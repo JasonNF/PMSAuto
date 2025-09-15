@@ -159,16 +159,48 @@
       </div>
     </section>
 
+    <!-- 幸运大转盘弹层 -->
+    <div id="wheel-modal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close="wheel-modal"></div>
+      <div class="modal-panel wheel-panel">
+        <div class="modal-title wheel-titlebar">
+          <span class="wheel-title-icon" aria-hidden="true">🎡</span>
+          <span>幸运大转盘</span>
+          <button class="btn ghost" id="wheel-close" data-close="wheel-modal" style="margin-left:auto">×</button>
+        </div>
+        <div class="wheel-stage">
+          <canvas id="wheel-canvas" width="360" height="360"></canvas>
+          <div class="wheel-pointer" id="wheel-pointer"></div>
+          <button class="btn wheel-start" id="wheel-start">开始</button>
+        </div>
+        <div class="wheel-hint" id="wheel-hint"></div>
+      </div>
+    </div>
+
     <!-- 活动页（占位） -->
     <section class="page" id="page-activity">
       <div class="hero-card">
         <h2>活动专区</h2>
         <p>转盘、竞拍等互动活动</p>
       </div>
-      <div class="card">
-        <div class="card-title with-icon"><span class="icon">🎡</span><span>幸运大转盘</span></div>
-        <p>最低积分要求：30 ｜ 参与消耗：5</p>
-        <button class="btn primary" disabled>敬请期待</button>
+      <div class="card wheel-card">
+        <div class="wheel-head">
+          <div class="wheel-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#f59e0b"/><path d="M12 4v16M4 12h16M5.6 6.4l12.8 11.2M18.4 6.4L5.6 17.6" stroke="#fff" stroke-width="1.6"/></svg>
+          </div>
+          <div class="wheel-title">
+            <div class="t">幸运大转盘</div>
+            <div class="s">转一转，赢取丰厚奖励</div>
+          </div>
+        </div>
+        <div class="wheel-badges">
+          <span class="badge wheel green">最低积分要求：<b id="wheel-min">-</b></span>
+          <span class="badge wheel blue">参与消耗积分：<b id="wheel-cost">-</b></span>
+        </div>
+        <div class="wheel-actions">
+          <button class="btn primary" id="wheel-open">立即参与</button>
+          <a class="wheel-link" id="wheel-open-link">点击进入活动</a>
+        </div>
       </div>
       <div class="card">
         <div class="card-title with-icon"><span class="icon">🔨</span><span>竞拍活动</span></div>

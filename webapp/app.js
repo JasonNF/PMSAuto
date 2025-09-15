@@ -29,6 +29,121 @@
     }
   }catch(_){ setTimeout(()=>document.body.classList.add('sf-ready'), 1200); }
 
+  // ===== 幸运大转盘 =====
+  const wheelOpenBtn = document.getElementById('wheel-open');
+  const wheelOpenLink = document.getElementById('wheel-open-link');
+  const wheelModal = document.getElementById('wheel-modal');
+  const wheelCanvas = document.getElementById('wheel-canvas');
+  const wheelStart = document.getElementById('wheel-start');
+  const wheelHint = document.getElementById('wheel-hint');
+  const wheelMinEl = document.getElementById('wheel-min');
+  const wheelCostEl = document.getElementById('wheel-cost');
+
+  let wheelCfg = { min_points: 30, cost_points: 5, items: [
+    { label: '积分+10', color: '#60a5fa' },
+    { label: '积分-10', color: '#67e8f9' },
+    { label: '谢谢参与', color: '#fca5a5' },
+    { label: '积分+30', color: '#fde68a' },
+    { label: 'Premium 7天', color: '#e9d5ff' },
+    { label: '积分+50', color: '#86efac' },
+    { label: '积分-200', color: '#f87171' },
+    { label: '积分+75', color: '#fde68a' },
+  ]};
+
+  async function loadWheelCfg(){
+    try{
+      const r = await fetch(`${API}/wheel/config`);
+      if (r.ok){ wheelCfg = await r.json(); }
+    }catch(_){ /* 使用默认配置 */ }
+    if (wheelMinEl) wheelMinEl.textContent = wheelCfg.min_points ?? '-';
+    if (wheelCostEl) wheelCostEl.textContent = wheelCfg.cost_points ?? '-';
+  }
+  loadWheelCfg();
+
+  function openWheel(){ if (wheelModal){ wheelModal.classList.add('show'); drawWheel(); } }
+  function closeWheel(){ if (wheelModal){ wheelModal.classList.remove('show'); } }
+  if (wheelOpenBtn) wheelOpenBtn.onclick = openWheel;
+  if (wheelOpenLink) wheelOpenLink.onclick = openWheel;
+  document.addEventListener('click', (e)=>{ const t=e.target; if (t && t.dataset?.close==='wheel-modal') closeWheel(); });
+
+  // 绘制转盘
+  function drawWheel(){
+    const cvs = wheelCanvas; if (!cvs) return; const ctx = cvs.getContext('2d');
+    const items = wheelCfg.items || []; const n = items.length || 8;
+    const cx = cvs.width/2, cy = cvs.height/2, r = Math.min(cx,cy)-8;
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-Math.PI/2); // 让第0区块指向上方
+    const arc = 2*Math.PI/n;
+    for (let i=0;i<n;i++){
+      const it = items[i] || {label:`ITEM ${i+1}`, color: i%2? '#93c5fd':'#fecaca'};
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.fillStyle = it.color; ctx.arc(0,0,r, i*arc, (i+1)*arc); ctx.fill();
+      // 文本
+      ctx.save();
+      ctx.rotate(i*arc + arc/2);
+      ctx.fillStyle = '#222';
+      ctx.font = 'bold 16px system-ui, -apple-system, Segoe UI, Roboto';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const text = String(it.label);
+      ctx.fillText(text, r*0.62, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+    // 外圈
+    ctx.beginPath(); ctx.lineWidth=10; ctx.strokeStyle = '#fff'; ctx.arc(cx,cy,r,0,2*Math.PI); ctx.stroke();
+    // 内圈阴影已由 CSS 控制
+  }
+
+  let spinning = false;
+  if (wheelStart){
+    wheelStart.onclick = async ()=>{
+      if (spinning) return; spinning = true; wheelHint && (wheelHint.textContent='');
+      try{
+        // 请求后端抽奖结果（返回中奖索引）
+        const r = await fetch(`${API}/wheel/spin`, { method:'POST' });
+        const data = r.ok ? await r.json() : { index: Math.floor(Math.random()*(wheelCfg.items?.length||8)) };
+        const index = Math.max(0, Math.min((wheelCfg.items?.length||8)-1, Number(data.index)||0));
+        await spinTo(index);
+        const prize = wheelCfg.items?.[index]?.label || '未知奖品';
+        wheelHint && (wheelHint.textContent = `恭喜，结果：${prize}`);
+      }catch(err){ wheelHint && (wheelHint.textContent='抽奖失败，请稍后再试'); }
+      finally{ spinning=false; }
+    };
+  }
+
+  async function spinTo(index){
+    const cvs = wheelCanvas; if (!cvs) return; const items = wheelCfg.items || []; const n = items.length || 8;
+    const arc = 2*Math.PI/n;
+    // 目标角度：让 index 位于指针顶部（指针在 -90 度）
+    const target = (index * arc) + arc/2; // 相对旋转基于 draw 的起始
+    // 简易旋转动画：CSS transform 会更方便，这里直接旋转 canvas
+    const totalRotate = 6*Math.PI + target; // 多转几圈
+    const duration = 3200; const start = performance.now();
+    const ctx = cvs.getContext('2d');
+    function frame(now){
+      const t = Math.min(1, (now-start)/duration);
+      const ease = 1 - Math.pow(1-t, 3);
+      const angle = -Math.PI/2 + ease*totalRotate;
+      // 重绘
+      const cx = cvs.width/2, cy = cvs.height/2; const r = Math.min(cx,cy)-8;
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
+      for (let i=0;i<n;i++){
+        const it = items[i] || {label:`ITEM ${i+1}`, color: i%2? '#93c5fd':'#fecaca'};
+        const a0 = i*arc, a1=(i+1)*arc;
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.fillStyle = it.color; ctx.arc(0,0,r, a0, a1); ctx.fill();
+        // 文本
+        ctx.save(); ctx.rotate(a0 + arc/2);
+        ctx.fillStyle = '#222'; ctx.font = 'bold 16px system-ui, -apple-system, Segoe UI, Roboto';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(it.label), r*0.62, 0);
+        ctx.restore();
+      }
+      ctx.restore();
+      ctx.beginPath(); ctx.lineWidth=10; ctx.strokeStyle='#fff'; ctx.arc(cx,cy,r,0,2*Math.PI); ctx.stroke();
+      if (t<1) requestAnimationFrame(frame);
+    }
+    return new Promise(res=>{ requestAnimationFrame(frame); setTimeout(res, duration+30); });
+  }
+
   // 轻量 Toast 提示
   function toast(msg){
     let t = document.getElementById('toast');

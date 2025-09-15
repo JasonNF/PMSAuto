@@ -81,6 +81,28 @@ body.sf-ready .tab .svg-fallback{ display:none; }
 
 .log{ background: rgba(0,0,0,.35); color:#fff; max-width:720px; margin: 8px auto; padding: 8px 12px; border-radius: 8px; white-space: pre-wrap; }
 
+/* 幸运大转盘卡片 */
+.wheel-card{ padding:16px; }
+.wheel-head{ display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.wheel-logo{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; background: linear-gradient(180deg,#fbbf24,#f59e0b); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.wheel-title .t{ font-size:18px; font-weight:800; }
+.wheel-title .s{ color:#6b7280; font-size:13px; }
+.wheel-badges{ display:flex; gap:10px; margin:10px 0 14px; flex-wrap:wrap; }
+.badge.wheel{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid rgba(0,0,0,.08); font-weight:600; font-size:13px; }
+.badge.wheel.green{ background: rgba(34,197,94,.10); color:#15803d; border-color: rgba(22,163,74,.25); }
+.badge.wheel.blue{ background: rgba(59,130,246,.10); color:#1d4ed8; border-color: rgba(59,130,246,.25); }
+.wheel-actions{ display:flex; align-items:center; gap:12px; }
+.wheel-link{ color:#2563eb; text-decoration:underline; cursor:pointer; }
+
+/* Wheel 弹层 */
+.wheel-panel{ width:min(92vw, 720px); }
+.wheel-titlebar{ display:flex; align-items:center; gap:10px; }
+.wheel-stage{ position:relative; display:flex; align-items:center; justify-content:center; padding: 18px 0 28px; }
+#wheel-canvas{ width:min(86vw, 520px); height:min(86vw, 520px); max-width:520px; max-height:520px; background:#fff; border-radius:50%; box-shadow: 0 20px 60px rgba(0,0,0,.15), inset 0 0 0 10px #fff; }
+.wheel-pointer{ position:absolute; top:12px; width:0; height:0; border-left:10px solid transparent; border-right:10px solid transparent; border-top:16px solid #f59e0b; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
+.wheel-start{ position:absolute; width:96px; height:96px; border-radius:999px; left:50%; top:50%; transform: translate(-50%,-50%); background:#2563eb; font-weight:800; box-shadow: 0 8px 30px rgba(37,99,235,.35); }
+.wheel-hint{ text-align:center; color:#64748b; padding-bottom:10px; }
+
 /* 个人信息卡片定制样式 */
 .card.profile{ padding:0; overflow:hidden; border-radius:22px; }
 .card.profile .card-title{

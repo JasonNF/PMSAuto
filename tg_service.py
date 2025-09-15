@@ -1,5 +1,6 @@
 import os
 import json
+import random
 import hmac
 import hashlib
 from urllib.parse import parse_qsl
@@ -348,6 +349,118 @@ def _get_default_initial_days(db) -> int:
     except Exception:
         pass
     return 30
+
+
+# ===== 幸运大转盘 =====
+def _default_wheel_config():
+    return {
+        "min_points": 30,
+        "cost_points": 5,
+        "items": [
+            {"label": "积分+10", "color": "#60a5fa", "weight": 1},
+            {"label": "积分-10", "color": "#67e8f9", "weight": 1},
+            {"label": "谢谢参与", "color": "#fca5a5", "weight": 1},
+            {"label": "积分+30", "color": "#fde68a", "weight": 1},
+            {"label": "Premium 7天", "color": "#e9d5ff", "weight": 1},
+            {"label": "积分+50", "color": "#86efac", "weight": 1},
+            {"label": "积分-200", "color": "#f87171", "weight": 1},
+            {"label": "积分+75", "color": "#fde68a", "weight": 1},
+        ],
+    }
+
+
+def _get_wheel_config(db):
+    try:
+        kv = db.query(Settings).filter(Settings.key == "wheel_config").first()
+        if kv and kv.value:
+            cfg = json.loads(kv.value)
+            # 兜底
+            if not isinstance(cfg.get("items", []), list) or not cfg["items"]:
+                cfg["items"] = _default_wheel_config()["items"]
+            return cfg
+    except Exception:
+        pass
+    return _default_wheel_config()
+
+
+def _set_wheel_config(db, cfg: dict):
+    if not isinstance(cfg, dict):
+        raise HTTPException(400, "配置应为 JSON 对象")
+    items = cfg.get("items")
+    if not isinstance(items, list) or not items:
+        raise HTTPException(400, "items 必须为非空数组")
+    # 简单校验字段
+    for it in items:
+        if not isinstance(it, dict) or "label" not in it:
+            raise HTTPException(400, "items 中每项需包含 label")
+        it.setdefault("color", "#93c5fd")
+        it.setdefault("weight", 1)
+    min_points = int(cfg.get("min_points", 0))
+    cost_points = int(cfg.get("cost_points", 0))
+    cfg = {"min_points": min_points, "cost_points": cost_points, "items": items}
+    kv = db.query(Settings).filter(Settings.key == "wheel_config").first()
+    if not kv:
+        kv = Settings(key="wheel_config", value=json.dumps(cfg, ensure_ascii=False))
+    else:
+        kv.value = json.dumps(cfg, ensure_ascii=False)
+    db.add(kv)
+    db.commit()
+    return cfg
+
+
+@app.get("/app/api/wheel/config")
+async def get_wheel_config():
+    db = SessionLocal()
+    try:
+        return _get_wheel_config(db)
+    finally:
+        db.close()
+
+
+@app.post("/admin/wheel/config")
+async def set_wheel_config(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    db = SessionLocal()
+    try:
+        cfg = _set_wheel_config(db, body)
+        return {"ok": True, "config": cfg}
+    finally:
+        db.close()
+
+
+@app.post("/app/api/wheel/spin")
+async def wheel_spin(request: Request):
+    # 这里可以按需做 initData 校验和积分扣除；先返回结果索引
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    db = SessionLocal()
+    try:
+        cfg = _get_wheel_config(db)
+        items = cfg.get("items", [])
+        n = len(items) or 8
+        weights = [max(0.0, float(it.get("weight", 1))) for it in items] if items else None
+        if items and sum(weights) > 0:
+            # 加权随机
+            choices = list(range(n))
+            rnd = random.random() * sum(weights)
+            acc = 0.0
+            pick = 0
+            for i, w in enumerate(weights):
+                acc += w
+                if rnd <= acc:
+                    pick = i
+                    break
+        else:
+            pick = random.randint(0, n-1)
+        label = items[pick]["label"] if items and 0 <= pick < len(items) else f"ITEM {pick+1}"
+        return {"ok": True, "index": pick, "prize": label}
+    finally:
+        db.close()
 
 
 def _local_datestr(dt_obj: datetime | None = None) -> str:
