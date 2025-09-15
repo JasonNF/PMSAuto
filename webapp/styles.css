@@ -33,13 +33,13 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .hero-card h2{ margin:0 0 8px; }
 .hero-card p{ margin:0; color: var(--muted); }
 
-.card { background: var(--card); color: var(--text); border-radius: 18px; padding: 14px; margin: 14px 6px; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+.card { background: var(--card); color: var(--text); border-radius: 18px; padding: 14px; margin: 14px 6px; box-shadow: 0 10px 30px rgba(0,0,0,.12); overflow: hidden; }
 .card-title { font-weight: 700; margin-bottom: 10px; }
 .with-icon .icon { margin-right: 6px; }
 .kv .k{ color: var(--muted); display:inline-block; min-width: 84px; line-height: 1.6; }
 .kv .v{ font-weight: 600; line-height: 1.6; }
 .kv > div{ padding: 12px 2px; }
-.card-actions{ margin-top: 10px; display:flex; gap:10px; flex-wrap: wrap; }
+.card-actions{ margin-top: 10px; display:flex; gap:10px; flex-wrap: wrap; padding-bottom: 8px; }
 .card-actions.row .btn{ flex:1; }
 
 .btn{ background: var(--primary); color: var(--primary-contrast); border:0; border-radius: 999px; padding: 10px 16px; cursor: pointer; }
@@ -86,6 +86,10 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .card.profile .kv > div:last-child{ border-bottom:0; }
 .card.profile .kv .k{ min-width:auto; }
 .card.profile .kv .v{ font-weight: 400; } /* 内容不加粗 */
+
+/* 个人信息卡片底部操作按钮区域内边距，防止按钮与圆角重叠溢出 */
+.card.profile .card-actions{ padding: 10px 14px 14px; }
+.card.profile .card-actions .btn{ flex:1 1 calc(33.333% - 10px); min-width: 0; }
 
 /* 数值胶囊高亮：积分（橙色）、捐赠（绿色） */
 .card.profile #kv-points{
