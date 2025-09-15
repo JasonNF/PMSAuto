@@ -30,6 +30,29 @@
         </div>
       </div>
 
+      <!-- 注册/绑定 弹层 -->
+      <div id="register-modal" class="modal" aria-hidden="true">
+        <div class="modal-backdrop" data-close="register-modal"></div>
+        <div class="modal-panel">
+          <div class="modal-title">注册 / 绑定</div>
+          <div class="form">
+            <div class="form-row">
+              <label for="reg-username">用户名</label>
+              <input id="reg-username" type="text" placeholder="请输入要注册的用户名" autocomplete="username" />
+            </div>
+            <div class="form-row">
+              <label for="reg-password">密码</label>
+              <input id="reg-password" type="password" placeholder="请输入密码" autocomplete="new-password" />
+            </div>
+            <div class="form-error" id="reg-error" style="display:none"></div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn ghost" id="reg-cancel" data-close="register-modal">取消</button>
+            <button class="btn primary" id="reg-submit">提交</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card profile">
         <div class="card-title with-icon">
           <span class="icon">👤</span>

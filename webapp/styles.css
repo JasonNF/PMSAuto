@@ -177,3 +177,11 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .icon-btn.enter{ background:#e0ecff; }
 .icon-btn.copy{ background:#eef2ff; }
 .icon-btn svg{ display:block; }
+
+/* 表单样式（弹层内） */
+.modal .form{ display:flex; flex-direction: column; gap:12px; padding: 6px 2px; }
+.modal .form-row{ display:flex; flex-direction: column; gap:6px; }
+.modal .form-row label{ font-size: 13px; color:#64748b; }
+.modal .form-row input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,.12); outline:none; }
+.modal .form-row input:focus{ border-color:#6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+.modal .form-error{ color:#dc2626; font-size:13px; }

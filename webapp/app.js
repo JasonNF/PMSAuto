@@ -224,34 +224,39 @@
     }
   }
 
-  if (btnReg) {
-    btnReg.onclick = async () => {
-      const initData = tg?.initData || '';
-      const username = prompt('请输入要注册的用户名：');
-      if (!username) return;
-      const password = prompt('请输入密码：');
-      if (!password) return;
-      try {
-        const resp = await fetch(`${API}/register`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ initData, username, password }),
-        });
-        const text = await resp.text();
-        let data; try { data = JSON.parse(text); } catch(_) { data = { ok:false, raw:text }; }
-        if (!data.ok) {
-          log('注册失败：' + JSON.stringify(data));
-          alert('注册失败');
-          return;
-        }
-        alert('注册成功，已自动绑定 Telegram');
-        await verifyInitData();
-      } catch (e) {
-        log('注册异常：' + String(e));
-        alert('注册异常');
-      }
-    };
+  // 注册弹层交互
+  const regModal = document.getElementById('register-modal');
+  const regUser = document.getElementById('reg-username');
+  const regPass = document.getElementById('reg-password');
+  const regErr = document.getElementById('reg-error');
+  const regCancel = document.getElementById('reg-cancel');
+  const regSubmit = document.getElementById('reg-submit');
+
+  function openReg(){ if (regModal){ regModal.classList.add('show'); regErr && (regErr.style.display='none'); regUser && (regUser.value=''); regPass && (regPass.value=''); setTimeout(()=>{ regUser?.focus(); }, 50); } }
+  function closeReg(){ if (regModal){ regModal.classList.remove('show'); } }
+
+  if (btnReg) { btnReg.onclick = () => openReg(); }
+  if (regCancel) { regCancel.onclick = () => closeReg(); }
+  if (regModal) { regModal.addEventListener('click', (e)=>{ const t=e.target; if (t && t.dataset?.close==='register-modal') closeReg(); }); }
+  async function submitReg(){
+    const initData = tg?.initData || '';
+    const username = (regUser?.value || '').trim();
+    const password = (regPass?.value || '').trim();
+    if (!username || !password){ if (regErr){ regErr.textContent='请输入用户名与密码'; regErr.style.display='block'; } return; }
+    try{
+      regSubmit && (regSubmit.disabled=true);
+      const resp = await fetch(`${API}/register`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ initData, username, password }) });
+      const text = await resp.text();
+      let data; try{ data = JSON.parse(text); } catch(_){ data = { ok:false, raw:text }; }
+      if (!data.ok){ if (regErr){ regErr.textContent='注册失败'; regErr.style.display='block'; } return; }
+      closeReg();
+      toast('注册成功，已自动绑定');
+      await verifyInitData();
+    }catch(e){ if (regErr){ regErr.textContent='注册异常'; regErr.style.display='block'; } }
+    finally{ regSubmit && (regSubmit.disabled=false); }
   }
+  if (regSubmit){ regSubmit.onclick = submitReg; }
+  if (regPass){ regPass.addEventListener('keypress', (e)=>{ if (e.key==='Enter') submitReg(); }); }
 
   if (btnPts) {
     btnPts.onclick = async () => {
