@@ -17,29 +17,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto
 main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 
 .hero-card {
-  position: relative;
-  background: linear-gradient(135deg, rgba(255,255,255,.28), rgba(255,255,255,.14));
+  background:rgba(255,255,255,.85);
   color: var(--text);
-  border-radius: 26px; /* 更圆润 */
+  border-radius: 18px;
   padding: 28px 18px;             /* 增加内边距，显得不拥挤 */
   min-height: 120px;              /* 提升整体高度 */
-  box-shadow: 0 14px 40px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.28); /* 略弱化阴影 */
-  border: 1px solid rgba(255,255,255,.35);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 12px 40px rgba(0,0,0,.12);
   margin: 10px 6px 16px;
   text-align:center;
   display:flex;                   /* 使用 Flex 完全居中 */
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-}
-.hero-card::before{
-  content:"";
-  position:absolute; inset:-2px -2px auto auto; width:60%; height:60%;
-  background: radial-gradient(120px 120px at 100% 0%, rgba(255,255,255,.65), rgba(255,255,255,0));
-  pointer-events:none;
 }
 .hero-card h2{ margin:0 0 8px; }
 .hero-card p{ margin:0; color: var(--muted); }
@@ -82,7 +71,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .log{ background: rgba(0,0,0,.35); color:#fff; max-width:720px; margin: 8px auto; padding: 8px 12px; border-radius: 8px; white-space: pre-wrap; }
 
 /* 个人信息卡片定制样式 */
-.card.profile{ padding:0; overflow:hidden; border-radius:22px; background: linear-gradient(135deg, rgba(255,255,255,.26), rgba(255,255,255,.12)); border:1px solid rgba(255,255,255,.32); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); box-shadow: 0 12px 36px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.25); }
+.card.profile{ padding:0; overflow:hidden; border-radius:22px; }
 .card.profile .card-title{
   display:flex; align-items:center; justify-content:center; gap:8px;
   margin:0; padding:16px 12px;
@@ -126,7 +115,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .badge-red{ background: rgba(248,113,113,.12); color:#dc2626; border-color: rgba(239,68,68,.25); }
 
 /* Emby 账户卡片定制 */
-.card.emby{ padding:0; overflow:hidden; border-radius:22px; background: linear-gradient(135deg, rgba(255,255,255,.26), rgba(255,255,255,.12)); border:1px solid rgba(255,255,255,.32); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); box-shadow: 0 12px 36px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.25); }
+.card.emby{ padding:0; overflow:hidden; border-radius:22px; }
 .card.emby .card-title{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:16px 12px; font-size:20px; font-weight:800; background: linear-gradient(180deg, rgba(37,99,235,.12), rgba(37,99,235,.04)); border-bottom:1px solid rgba(15,23,42,.08); }
 .card.emby .with-icon .icon{ margin-right:0; }
 .card.emby .with-icon .icon-svg{ width:20px; height:20px; margin-right:6px; display:inline-block; vertical-align:middle; }
@@ -168,19 +157,6 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 88px; }
 .badge-blue{ background: rgba(59,130,246,.10); color:#1d4ed8; border-color: rgba(59,130,246,.35); }
 
 /* 交流讨论卡片标题：居中且与 Emby 卡片字号一致 */
-.card.discuss{ border-radius:22px; background: linear-gradient(135deg, rgba(255,255,255,.26), rgba(255,255,255,.12)); border:1px solid rgba(255,255,255,.32); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); box-shadow: 0 12px 36px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.25); }
-
-/* 对不支持 backdrop-filter 的环境提供兜底样式 */
-@supports not ((backdrop-filter: blur(1px))) {
-  .hero-card,
-  .card.profile,
-  .card.emby,
-  .card.discuss{
-    background: rgba(255,255,255,.72); /* 提升不透明度，模拟玻璃 */
-    border-color: rgba(255,255,255,.65);
-    box-shadow: 0 10px 28px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.35);
-  }
-}
 .card.discuss .card-title{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:16px 12px; font-size:20px; font-weight:800; }
 
 /* 轻量 Toast */
