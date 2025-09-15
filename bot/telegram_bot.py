@@ -1,7 +1,7 @@
 import os
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 EXTERNAL_BASE_URL = os.environ.get("EXTERNAL_BASE_URL") or ""
@@ -27,6 +27,16 @@ async def cmd_start(message: Message):
     payload = parts[1] if len(parts) > 1 else None
 
     kb = build_open_keyboard(label="打开 PMSAuto 应用", url=WEBAPP_URL)
+
+    # 为当前会话设置菜单按钮为 WebApp，标题为“女助理”，点击直接打开 MiniApp
+    try:
+        await message.bot.set_chat_menu_button(
+            chat_id=message.chat.id,
+            menu_button=MenuButtonWebApp(text="女助理", web_app=WebAppInfo(url=WEBAPP_URL)),
+        )
+    except Exception:
+        # 忽略非关键错误，仍继续回复欢迎消息
+        pass
 
     intro = [
         "欢迎使用 PMSAuto 机器人！",
