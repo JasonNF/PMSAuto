@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from emby_admin_service import emby_create_user, emby_set_password
 
 from emby_admin_models import SessionLocal, UserAccount, RenewalCode
+from log import logger
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 WEBHOOK_PATH = "/tg/webhook"
@@ -99,6 +100,18 @@ def verify_webapp_initdata(init_data: str) -> dict:
         digestmod=hashlib.sha256,
     ).hexdigest()
     if calc_hash != received_hash:
+        # 记录调试信息以辅助定位（不包含敏感明文，仅摘要）
+        try:
+            keys = sorted(list(params.keys()))
+        except Exception:
+            keys = []
+        logger.warning(
+            "WebApp initData HMAC 校验失败: keys=%s recv=%s calc=%s len=%s",
+            keys,
+            (received_hash or "")[:8],
+            calc_hash[:8],
+            len(init_data or ""),
+        )
         raise HTTPException(401, "Invalid initData")
     # 解析 user 信息
     result = {"ok": True}
@@ -249,3 +262,17 @@ async def app_redeem(request: Request):
 
 # 最后再挂载 MiniApp 静态目录，避免静态路由拦截 /app/api/* 导致 405
 app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")
+
+
+@app.get("/tg/me")
+async def tg_me():
+    if bot is None:
+        raise HTTPException(500, "Bot 未初始化")
+    me = await bot.get_me()
+    return {
+        "ok": True,
+        "id": me.id,
+        "username": me.username,
+        "first_name": me.first_name,
+        "EXTERNAL_BASE_URL": EXTERNAL_BASE_URL,
+    }
