@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from emby_admin_service import emby_create_user, emby_set_password
 
-from emby_admin_models import SessionLocal, UserAccount, RenewalCode
+from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Base, engine
 from log import logger
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ""
@@ -39,6 +39,17 @@ app.add_middleware(
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+
+@app.on_event("startup")
+def _startup_create_tables():
+    """启动时自动创建缺失的数据表。"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("数据库表检查/创建完成")
+    except Exception as e:
+        # 不阻断启动，但打印错误便于排查
+        logger.error("数据库表创建失败: %s", e)
 
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):

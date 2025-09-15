@@ -313,3 +313,74 @@ journalctl -u pmsauto -f
 - 502 Bad Gateway：检查 nginx 反代是否指向 127.0.0.1:8000；本地 `/healthz` 是否为 {"ok": true}
 - Bot 无响应：`journalctl -u pmsauto -e` 查看错误；确认 TELEGRAM_BOT_TOKEN 正确；重新访问 `/tg/setup`
 - MiniApp 404：检查 `location /app/` 反代是否生效
+
+---
+
+### Nginx Proxy Manager (NPM) 反向代理配置指南
+
+若你的域名由 Nginx Proxy Manager 管理，请按以下步骤将 PMSAuto 后端（Uvicorn：`127.0.0.1:8000`）通过 NPM 对外暴露：
+
+1) 新建/编辑 Proxy Host
+- Domain Names：`pms.misaya.org`
+- Scheme：`HTTP`
+- Forward Hostname/IP：
+  - 同机部署填 `127.0.0.1`
+  - 异机部署填 PMSAuto 所在服务器的内网/公网 IP
+- Forward Port：`8000`
+- Options：
+  - 勾选 `Websockets Support`
+  - 勾选 `Block Common Exploits`
+- SSL：
+  - 选择有效证书（Let’s Encrypt 或已上传）
+  - 勾选 `Force SSL`、`HTTP/2 Support`
+
+2) 添加 Custom Locations（关键）
+- Location 1：
+  - Path：`/tg/`
+  - Forward Hostname/IP：同上
+  - Forward Port：`8000`
+  - Scheme：`HTTP`
+- Location 2：
+  - Path：`/app/`
+  - Forward Hostname/IP：同上
+  - Forward Port：`8000`
+  - Scheme：`HTTP`
+- Location 3：
+  - Path：`/healthz`
+  - Forward Hostname/IP：同上
+  - Forward Port：`8000`
+  - Scheme：`HTTP`
+
+说明：NPM 的 Custom Locations 不支持 Nginx 的 `= /healthz` 精确匹配语法，但用 `/healthz` 作为路径即可。
+
+3) 高级设置（可选，建议）
+在 Proxy Host 的 Advanced 中加入以下片段：
+```
+proxy_connect_timeout 300s;
+proxy_send_timeout 300s;
+proxy_read_timeout 300s;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Host $host;
+proxy_intercept_errors off;
+```
+
+4) 保存并应用
+点击 `Save`，NPM 会自动重载配置。
+
+5) 验证与接入
+```
+# 后端本机（在 PMSAuto 服务器上）
+curl -sS http://127.0.0.1:8000/healthz          # 期望 {"ok": true}
+
+# 公网（通过 NPM 反代）
+curl -i https://pms.misaya.org/healthz           # 期望 200 与 {"ok": true}
+curl -sS https://pms.misaya.org/tg/setup         # 期望 {"ok": true, "webhook_url": "https://pms.misaya.org/tg/webhook"}
+```
+
+6) 常见排错
+- 仍 502：
+  - 确认 Custom Locations 已添加，且未被更宽的路径拦截
+  - NPM 与 PMSAuto 是否同机；异机需确保 8000 端口可达
+  - 后端是否监听 `127.0.0.1:8000` 或 `0.0.0.0:8000`（异机需非回环地址）
+- getWebhookInfo 显示 502：
+  - 说明 Telegram 访问 `/tg/webhook` 失败；重复自检 /healthz 与 NPM 路由
