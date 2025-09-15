@@ -418,3 +418,54 @@ curl -sS https://你的域名/tg/setup
 - 安装依赖（按 `pyproject.toml`），并固定 `requests==2.31.0`
 - `systemctl restart pmsauto` 并输出 `status`
 - 健康检查 `http://127.0.0.1:8000/healthz`
+
+---
+
+### 线路选择功能（AVAILABLE_ROUTES 配置与使用）
+
+本项目支持为 Emby 用户提供“入口线路/绑定线路”的能力：
+
+- __入口线路__：来自后端环境变量 `EMBY_BASE_URL`，用于展示默认入口。
+- __绑定线路__：用户在 MiniApp 内自行选择的线路，保存到数据库（`settings.key=route:{emby_user_id}`）。前端播放或客户端连接时可据此指引使用。
+
+#### 1) 开启方式
+在服务器的环境变量文件 `/etc/pmsauto.env` 中新增（或编辑）如下配置：
+
+```
+# 多条线路用英文逗号分隔。每条线路可选择性附带“标签”，格式为 host|标签1,标签2
+AVAILABLE_ROUTES=kr1.stream.funmedia.10101.io|韩国,甲骨文,jp1.stream.funmedia.10101.io|日本,甲骨文,联通,funmedia.domob.org|美国
+```
+
+注意：
+- 逗号用于分隔不同线路项；竖线 `|` 用于为该 host 增加标签；标签之间使用英文逗号分隔。
+- 校验以 host 为准，绑定时必须填写在 `AVAILABLE_ROUTES` 中出现过的 host。
+- 如不需要标签，可仅写 host：例如 `AVAILABLE_ROUTES=a.example.com,b.example.com`。
+
+修改完成后重启服务使配置生效：
+```
+sudo systemctl restart pmsauto
+```
+
+#### 2) 前端使用流程
+1. 打开 MiniApp → `Emby 账户` 卡片。
+2. 点击“绑定线路”徽章（带有下拉箭头）。
+3. 弹出线路选择面板：
+   - 展示后端提供的 host 列表与彩色标签。
+   - 当前已绑定项以蓝色描边高亮。
+4. 点击任一线路即完成绑定，徽章会即时更新为选中线路并高亮。
+
+#### 3) 接口与数据存储
+- 读取：`GET /app/api/routes` 返回 `{ available: [...], bound: "host" }`
+- 绑定：`POST /app/api/routes/bind`，Body：`{ initData: string, route: "host" }`
+- 存储：`settings` 表，键为 `route:{emby_user_id}`，值为所选 `host`
+
+#### 4) 常见问题（FAQ）
+- 设置了 `AVAILABLE_ROUTES` 但前端列表为空？
+  - 确认是否重启服务；检查环境变量文件是否被 systemd 正确加载：
+    ```
+    systemctl show pmsauto -p EnvironmentFile | cat
+    sed -n '1,160p' /etc/pmsauto.env
+    ```
+- 想展示更多标签颜色？
+  - 当前内置基础样式：`.tag`（灰）、`.tag.green`、`.tag.purple`、`.tag.blue`、`.tag.red`。
+  - 你可以在 `webapp/styles.css` 中继续扩展更多色板。

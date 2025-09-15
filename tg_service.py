@@ -294,8 +294,15 @@ async def app_bind_route(request: Request):
     route = (body.get("route") or "").strip()
     if not route:
         raise HTTPException(400, "route 必填")
-    if AVAILABLE_ROUTES and route not in AVAILABLE_ROUTES:
-        raise HTTPException(400, "不在可选线路列表中")
+    # 允许 AVAILABLE_ROUTES 使用 host|tag1,tag2 的格式，此时以 host 作为校验
+    if AVAILABLE_ROUTES:
+        allowed_hosts = []
+        for item in AVAILABLE_ROUTES:
+            host = str(item).split("|", 1)[0].strip()
+            if host:
+                allowed_hosts.append(host)
+        if route not in allowed_hosts:
+            raise HTTPException(400, "不在可选线路列表中")
     verified = verify_webapp_initdata(init_data)
     tg_id = verified.get("tg_id")
     if not tg_id:
