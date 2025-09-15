@@ -52,12 +52,17 @@ def _startup_create_tables():
     """启动时自动创建缺失的数据表。"""
     try:
         Base.metadata.create_all(bind=engine)
-        # 初始化默认设置：默认初始天数 30
+        # 初始化默认设置：默认初始天数 180（可通过 DEFAULT_INITIAL_DAYS 环境变量覆盖）
         db = SessionLocal()
         try:
             kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
             if not kv:
-                kv = Settings(key="default_initial_days", value="30")
+                default_days_env = os.environ.get("DEFAULT_INITIAL_DAYS")
+                try:
+                    init_days = int(default_days_env) if default_days_env is not None else 180
+                except Exception:
+                    init_days = 180
+                kv = Settings(key="default_initial_days", value=str(init_days))
                 db.add(kv)
                 db.commit()
         finally:
@@ -377,13 +382,24 @@ def _compute_days_remaining(expires_at) -> int | None:
 
 
 def _get_default_initial_days(db) -> int:
+    # 优先环境变量覆盖
+    env_val = os.environ.get("DEFAULT_INITIAL_DAYS")
+    if env_val is not None:
+        try:
+            v = int(env_val)
+            if 0 <= v <= 3650:
+                return v
+        except Exception:
+            pass
+    # 其次读取数据库设置
     try:
         kv = db.query(Settings).filter(Settings.key == "default_initial_days").first()
         if kv and kv.value and str(kv.value).isdigit():
             return int(kv.value)
     except Exception:
         pass
-    return 30
+    # 最后回退到 180
+    return 180
 
 
 def _normalize_entry_url() -> str:
