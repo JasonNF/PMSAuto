@@ -123,8 +123,9 @@ def emby_set_disabled(user_id: str, is_disabled: bool) -> None:
 
 def emby_test_login(username: str, password: str, *, use_password_field: bool=False) -> bool:
     """尝试使用用户名+密码在 Emby 进行一次认证，返回是否成功。
-    Jellyfin/Emby 一般使用 POST /Users/AuthenticateByName，Body: { Username, Pw }。
-    个别版本也接受 { Username, Password }。
+    - 首选 POST /Users/AuthenticateByName
+    - 添加 X-Emby-Authorization 以兼容 Emby 的鉴权要求
+    - 支持 {Username,Pw} 与 {Username,Password}
     """
     try:
         url = f"{EMBY_BASE_URL}/Users/AuthenticateByName"
@@ -133,11 +134,17 @@ def emby_test_login(username: str, password: str, *, use_password_field: bool=Fa
             body["Password"] = password
         else:
             body["Pw"] = password
-        # 不携带 X-Emby-Token，避免与密码登录冲突
-        resp = requests.post(url, headers={"Content-Type": "application/json"}, json=body)
+        headers = {
+            "Content-Type": "application/json",
+            # 一些 Emby 版本需要此头才允许用户名密码认证
+            "X-Emby-Authorization": 'MediaBrowser Client="PMSAuto", Device="Server", DeviceId="pmsauto", Version="1.0"',
+        }
+        resp = requests.post(url, headers=headers, json=body)
         if resp.status_code == 200:
             return True
-        return False
+        else:
+            logger.info("emby_test_login non-200: %s", resp.status_code)
+            return False
     except Exception as e:
         logger.warning("emby_test_login error: %s", e)
         return False
