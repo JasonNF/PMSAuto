@@ -18,6 +18,34 @@
         <p>账户信息与服务管理</p>
       </div>
 
+      <!-- 重置密码 弹层 -->
+      <div id="reset-modal" class="modal" aria-hidden="true">
+        <div class="modal-backdrop" data-close="reset-modal"></div>
+        <div class="modal-panel">
+          <div class="modal-title">重置 Emby 密码</div>
+          <div class="form">
+            <div class="form-row">
+              <label for="rpw1">新密码</label>
+              <input id="rpw1" type="password" placeholder="至少 6 位" autocomplete="new-password" />
+            </div>
+            <div class="form-row">
+              <label for="rpw2">确认新密码</label>
+              <input id="rpw2" type="password" placeholder="再次输入新密码" autocomplete="new-password" />
+            </div>
+            <div class="form-row">
+              <label style="display:flex; align-items:center; gap:6px;">
+                <input id="rpw-show" type="checkbox" /> 显示密码
+              </label>
+            </div>
+            <div class="form-error" id="rpw-error" style="display:none"></div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn ghost" id="rpw-cancel" data-close="reset-modal">取消</button>
+            <button class="btn primary" id="rpw-submit">提交</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 线路选择弹层（点击“绑定线路”时显示） -->
       <div id="route-modal" class="modal" aria-hidden="true">
         <div class="modal-backdrop" data-close="route-modal"></div>
@@ -283,6 +311,6 @@
 
   <pre id="log" class="log"></pre>
 
-  <script src="/app/app.js?v=20250915-02"></script>
+  <script src="/app/app.js?v=20250916-01"></script>
 </body>
 </html>

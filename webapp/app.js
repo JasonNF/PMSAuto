@@ -409,6 +409,15 @@
   const regCancel = document.getElementById('reg-cancel');
   const regSubmit = document.getElementById('reg-submit');
 
+  // 重置密码弹层
+  const resetModal = document.getElementById('reset-modal');
+  const rpw1 = document.getElementById('rpw1');
+  const rpw2 = document.getElementById('rpw2');
+  const rpwShow = document.getElementById('rpw-show');
+  const rpwErr = document.getElementById('rpw-error');
+  const rpwCancel = document.getElementById('rpw-cancel');
+  const rpwSubmit = document.getElementById('rpw-submit');
+
   function openReg(){ if (regModal){ regModal.classList.add('show'); regErr && (regErr.style.display='none'); regUser && (regUser.value=''); regPass && (regPass.value=''); setTimeout(()=>{ regUser?.focus(); }, 50); } }
   function closeReg(){ if (regModal){ regModal.classList.remove('show'); } }
 
@@ -435,33 +444,30 @@
   if (regSubmit){ regSubmit.onclick = submitReg; }
   if (regPass){ regPass.addEventListener('keypress', (e)=>{ if (e.key==='Enter') submitReg(); }); }
 
-  if (btnReset) {
-    btnReset.onclick = async () => {
-      if (busy) return;
-      const currentAcc = current?.account || {};
-      if (!currentAcc.bound){ return alert('请先注册/绑定账户'); }
-      // 简单交互：两次输入校验
-      const p1 = prompt('请输入新的 Emby 登录密码（至少6位）');
-      if (!p1) return;
-      if (p1.length < 6) return alert('密码至少 6 位');
-      const p2 = prompt('请再次输入确认密码');
-      if (p1 !== p2) return alert('两次输入不一致');
-      try{
-        setBusy(true);
-        const initData = tg?.initData || '';
-        const resp = await fetch(`${API}/reset_password`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ initData, new_password: p1 }) });
-        const data = await resp.json().catch(()=>({ ok:false }));
-        if (!resp.ok || !data.ok){
-          log('重置密码失败：' + JSON.stringify(data));
-          return alert('重置失败，请稍后再试');
-        }
-        alert('密码已重置成功');
-      }catch(e){
-        log('重置密码异常：' + String(e));
-        alert('重置异常');
-      }finally{ setBusy(false); }
-    };
+  function openReset(){ if (resetModal){ resetModal.classList.add('show'); rpwErr && (rpwErr.style.display='none'); rpw1 && (rpw1.value=''); rpw2 && (rpw2.value=''); setTimeout(()=>{ rpw1?.focus(); }, 50); } }
+  function closeReset(){ if (resetModal){ resetModal.classList.remove('show'); } }
+  if (rpwShow){ rpwShow.addEventListener('change', ()=>{ const t = rpwShow.checked ? 'text':'password'; if (rpw1) rpw1.type = t; if (rpw2) rpw2.type = t; }); }
+  if (resetModal) { resetModal.addEventListener('click', (e)=>{ const t=e.target; if (t && t.dataset?.close==='reset-modal') closeReset(); }); }
+  if (rpwCancel) rpwCancel.onclick = closeReset;
+  async function doReset(){
+    const currentAcc = current?.account || {};
+    if (!currentAcc.bound){ rpwErr && (rpwErr.textContent='请先注册/绑定账户'); rpwErr && (rpwErr.style.display='block'); return; }
+    const p1 = (rpw1?.value || '').trim();
+    const p2 = (rpw2?.value || '').trim();
+    if (p1.length < 6){ rpwErr && (rpwErr.textContent='密码至少 6 位'); rpwErr && (rpwErr.style.display='block'); return; }
+    if (p1 !== p2){ rpwErr && (rpwErr.textContent='两次输入不一致'); rpwErr && (rpwErr.style.display='block'); return; }
+    try{
+      rpwSubmit && (rpwSubmit.disabled = true);
+      const initData = tg?.initData || '';
+      const resp = await fetch(`${API}/reset_password`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ initData, new_password: p1 }) });
+      const data = await resp.json().catch(()=>({ ok:false }));
+      if (!resp.ok || !data.ok){ rpwErr && (rpwErr.textContent='重置失败，请稍后再试'); rpwErr && (rpwErr.style.display='block'); return; }
+      closeReset(); toast('密码已重置成功');
+    }catch(e){ rpwErr && (rpwErr.textContent='重置异常'); rpwErr && (rpwErr.style.display='block'); }
+    finally{ rpwSubmit && (rpwSubmit.disabled = false); }
   }
+  if (rpwSubmit) rpwSubmit.onclick = doReset;
+  if (btnReset){ btnReset.onclick = openReset; }
 
   if (btnBindExisting) {
     btnBindExisting.onclick = async () => {
