@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import json
+import os
 import re
 from pathlib import Path
 from time import sleep
@@ -8,7 +9,16 @@ from typing import Dict, List, Optional, Sequence, Union
 
 import requests
 from log import logger
-from settings import EMBY_API_TOKEN, EMBY_BASE_URL, STRM_FILE_PATH
+try:
+    import settings as _cfg
+except Exception:  # pragma: no cover
+    _cfg = object()
+
+# 读取配置，缺失时使用环境变量或默认值兜底
+EMBY_API_TOKEN = getattr(_cfg, "EMBY_API_TOKEN", os.environ.get("EMBY_API_TOKEN", ""))
+EMBY_BASE_URL = getattr(_cfg, "EMBY_BASE_URL", os.environ.get("EMBY_BASE_URL", ""))
+# 兼容历史字段：优先 STRM_FILE_PATH；没有则退回 EMBY_STRM_ASSISTANT_MEDIAINFO；再退回临时目录
+STRM_FILE_PATH = getattr(_cfg, "STRM_FILE_PATH", getattr(_cfg, "EMBY_STRM_ASSISTANT_MEDIAINFO", os.environ.get("STRM_FILE_PATH", "/tmp/strm")))
 from strm import create_strm_file
 
 
