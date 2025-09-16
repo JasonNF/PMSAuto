@@ -15,7 +15,7 @@ from aiogram.types import Update, BotCommand
 from bot.telegram_bot import bot, dp, build_open_keyboard
 from fastapi.middleware.cors import CORSMiddleware
 
-from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name
+from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name, emby_enable_local_password
 
 from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Settings, WatchStat, DonationStat, DailySnapshot, UserPref, Base, engine
 from log import logger
@@ -119,6 +119,33 @@ async def admin_get_default_days(request: Request):
         db.close()
 
 
+@app.post("/app/api/reset_password")
+async def app_reset_password(request: Request):
+    body = await request.json()
+    init_data = body.get("initData") or ""
+    new_password = (body.get("new_password") or "").strip()
+    if not new_password:
+        raise HTTPException(400, "new_password 必填")
+    verified = verify_webapp_initdata(init_data)
+    tg_id = verified.get("tg_id")
+    if not tg_id:
+        raise HTTPException(400, "未获取到 Telegram 用户")
+    db = SessionLocal()
+    try:
+        ua = _get_account_by_tg_id(db, tg_id)
+        if not ua:
+            raise HTTPException(404, "未绑定账户")
+        # 确保本地密码策略开启，再设置密码
+        try:
+            emby_enable_local_password(ua.emby_user_id)
+        except Exception:
+            pass
+        emby_set_password(ua.emby_user_id, new_password)
+        return {"ok": True}
+    finally:
+        db.close()
+
+
 # ---- Admin: 用户到期时间管理（Bearer 保护） ----
 @app.post("/admin/user/extend_days")
 async def admin_user_extend_days(request: Request):
@@ -144,6 +171,34 @@ async def admin_user_extend_days(request: Request):
         return {"ok": True, "expires_at": ua.expires_at.isoformat() if ua.expires_at else None}
     finally:
         db.close()
+
+
+# ---- Admin: 重置用户密码 ----
+@app.post("/admin/user/reset_password")
+async def admin_user_reset_password(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    emby_user_id = (body.get("emby_user_id") or "").strip()
+    username = (body.get("username") or "").strip()
+    new_password = (body.get("new_password") or "").strip()
+    if not new_password:
+        raise HTTPException(400, "new_password 必填")
+    if not emby_user_id and not username:
+        raise HTTPException(400, "emby_user_id 或 username 必填其一")
+    # 若仅提供用户名，则查询得到 emby_user_id
+    if not emby_user_id:
+        info = emby_find_user_by_name(username)
+        if not info or not info.get("Id"):
+            raise HTTPException(404, "未找到该用户名对应的 Emby 账户")
+        emby_user_id = info.get("Id")
+    try:
+        emby_set_password(emby_user_id, new_password)
+        return {"ok": True, "emby_user_id": emby_user_id}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(500, f"重置密码失败: {e}")
 
 
 @app.post("/admin/user/set_expires_by_name")

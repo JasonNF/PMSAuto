@@ -56,23 +56,44 @@ def emby_create_user(username: str) -> dict:
 
 
 def emby_set_password(user_id: str, new_password: str) -> None:
-    # Emby: POST /Users/{id}/Password
+    # Emby/Jellyfin: POST /Users/{id}/Password
+    # 兼容不同版本的字段命名，首次尝试 NewPw/CurrentPw，若未生效再尝试 NewPassword/CurrentPassword
     url = f"{EMBY_BASE_URL}/Users/{user_id}/Password"
-    payload = {
-        "ResetPassword": True,
-        "NewPw": new_password,
-        "CurrentPw": "",
-    }
-    resp = requests.post(
-        url,
-        headers=HEADERS,
-        params={"api_key": EMBY_API_TOKEN},
-        json=payload,
-    )
+    def _post_pwd(payload: dict):
+        return requests.post(url, headers=HEADERS, params={"api_key": EMBY_API_TOKEN}, json=payload)
+
+    # 第一次尝试
+    resp = _post_pwd({"ResetPassword": True, "NewPw": new_password, "CurrentPw": ""})
     if resp.status_code >= 300:
         txt = resp.text
-        logger.error(txt)
+        logger.error("set_password(NewPw) failed: %s", txt)
         raise HTTPException(status_code=resp.status_code, detail=f"Set password failed: {txt}")
+
+    # 验证是否已设置成功
+    ok = False
+    try:
+        u = emby_get_user(user_id) or {}
+        # 兼容不同字段
+        if u.get("HasPassword") is True or u.get("HasConfiguredPassword") is True:
+            ok = True
+    except Exception:
+        pass
+
+    if not ok:
+        # 再次尝试另一套字段
+        resp2 = _post_pwd({"ResetPassword": True, "NewPassword": new_password, "CurrentPassword": ""})
+        if resp2.status_code >= 300:
+            txt = resp2.text
+            logger.error("set_password(NewPassword) failed: %s", txt)
+            raise HTTPException(status_code=resp2.status_code, detail=f"Set password failed: {txt}")
+        try:
+            u2 = emby_get_user(user_id) or {}
+            if u2.get("HasPassword") is True or u2.get("HasConfiguredPassword") is True:
+                ok = True
+        except Exception:
+            ok = True  # 若无法校验，假定成功，避免阻断
+    if not ok:
+        logger.warning("Password may not have been set for user %s despite API success", user_id)
 
 
 def emby_set_disabled(user_id: str, is_disabled: bool) -> None:
@@ -84,6 +105,19 @@ def emby_set_disabled(user_id: str, is_disabled: bool) -> None:
         txt = resp.text
         logger.error(txt)
         raise HTTPException(status_code=resp.status_code, detail=f"Update policy failed: {txt}")
+
+
+def emby_enable_local_password(user_id: str) -> None:
+    """确保用户策略启用了本地密码登录（EnableUserLocalPassword）。
+    注意：某些 Emby/Jellyfin 部署默认关闭本地密码，需要显式打开。
+    """
+    url = f"{EMBY_BASE_URL}/Users/{user_id}/Policy"
+    payload = {"EnableUserLocalPassword": True, "IsDisabled": False}
+    resp = requests.post(url, headers=HEADERS, params={"api_key": EMBY_API_TOKEN}, json=payload)
+    if resp.status_code >= 300:
+        txt = resp.text
+        logger.error("enable_local_password failed: %s", txt)
+        raise HTTPException(status_code=resp.status_code, detail=f"Enable local password failed: {txt}")
 
 
 def emby_find_user_by_name(username: str) -> dict | None:
@@ -296,6 +330,11 @@ def register(req: RegisterReq):
         user_id = emby_user.get("Id")
         if not user_id:
             raise HTTPException(500, "Emby response missing Id")
+        # 确保本地密码策略开启，再设置密码
+        try:
+            emby_enable_local_password(user_id)
+        except Exception as e:
+            logger.warning("enable_local_password warn: %s", e)
         emby_set_password(user_id, req.password)
         # save local
         ua = UserAccount(

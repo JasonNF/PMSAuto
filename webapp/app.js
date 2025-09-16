@@ -2,7 +2,7 @@
   const logEl = document.getElementById('log');
   const userEl = document.getElementById('user');
   const btnReg = document.getElementById('btn-register');
-  const btnPts = document.getElementById('btn-points');
+  const btnReset = document.getElementById('btn-reset');
   const btnBindExisting = document.getElementById('btn-bind-existing');
   const btnRedeem = document.getElementById('btn-redeem');
   const btnRoute = null; // 移除独立按钮，改为点击绑定线路徽章触发
@@ -313,7 +313,7 @@
 
   function setBusy(v){
     busy = !!v;
-    const btns = [btnReg, btnPts, btnBindExisting, btnRedeem];
+    const btns = [btnReg, btnReset, btnBindExisting, btnRedeem];
     for (const b of btns){ if (b) b.disabled = busy; }
   }
 
@@ -435,19 +435,31 @@
   if (regSubmit){ regSubmit.onclick = submitReg; }
   if (regPass){ regPass.addEventListener('keypress', (e)=>{ if (e.key==='Enter') submitReg(); }); }
 
-  if (btnPts) {
-    btnPts.onclick = async () => {
+  if (btnReset) {
+    btnReset.onclick = async () => {
       if (busy) return;
-      setBusy(true);
-      log('刷新账户状态...');
-      try {
-        await verifyInitData();
-        log('状态已刷新');
-      } catch (e) {
-        log('刷新异常：' + String(e));
-      } finally {
-        setBusy(false);
-      }
+      const currentAcc = current?.account || {};
+      if (!currentAcc.bound){ return alert('请先注册/绑定账户'); }
+      // 简单交互：两次输入校验
+      const p1 = prompt('请输入新的 Emby 登录密码（至少6位）');
+      if (!p1) return;
+      if (p1.length < 6) return alert('密码至少 6 位');
+      const p2 = prompt('请再次输入确认密码');
+      if (p1 !== p2) return alert('两次输入不一致');
+      try{
+        setBusy(true);
+        const initData = tg?.initData || '';
+        const resp = await fetch(`${API}/reset_password`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ initData, new_password: p1 }) });
+        const data = await resp.json().catch(()=>({ ok:false }));
+        if (!resp.ok || !data.ok){
+          log('重置密码失败：' + JSON.stringify(data));
+          return alert('重置失败，请稍后再试');
+        }
+        alert('密码已重置成功');
+      }catch(e){
+        log('重置密码异常：' + String(e));
+        alert('重置异常');
+      }finally{ setBusy(false); }
     };
   }
 
