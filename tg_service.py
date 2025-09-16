@@ -81,6 +81,9 @@ def _startup_create_tables():
         finally:
             db.close()
 
+        logger.info("数据库表检查/创建完成")
+    except Exception as e:
+        logger.error("启动初始化失败: %s", e)
 
 # 管理员：测试用户名+密码是否能登录 Emby（排错用）
 @app.post("/admin/user/test_login")
