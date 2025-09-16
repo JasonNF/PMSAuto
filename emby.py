@@ -171,6 +171,125 @@ class Emby:
                 break
 
 
+    # ---------------- Emby 用户管理（注册/密码/策略/删除）----------------
+    @staticmethod
+    def _create_policy(*, admin: bool = False, disabled: bool = False, block_folders: Optional[list] = None,
+                       stream_limit: int = 2) -> dict:
+        """
+        参考 MiEmbybot 的策略：默认隐藏账号、限制转码下载、可远程访问；可按需屏蔽媒体库。
+        """
+        if block_folders is None:
+            block_folders = ["播放列表"]
+        return {
+            "IsAdministrator": admin,
+            "IsHidden": True,
+            "IsHiddenRemotely": True,
+            "IsDisabled": disabled,
+            "EnableRemoteControlOfOtherUsers": False,
+            "EnableSharedDeviceControl": False,
+            "EnableRemoteAccess": True,
+            "EnableLiveTvManagement": False,
+            "EnableLiveTvAccess": True,
+            "EnableMediaPlayback": True,
+            "EnableAudioPlaybackTranscoding": False,
+            "EnableVideoPlaybackTranscoding": False,
+            "EnablePlaybackRemuxing": False,
+            "EnableContentDeletion": False,
+            "EnableContentDownloading": False,
+            "EnableSubtitleDownloading": False,
+            "EnableSubtitleManagement": False,
+            "EnableSyncTranscoding": False,
+            "EnableMediaConversion": False,
+            "EnableAllDevices": True,
+            "SimultaneousStreamLimit": stream_limit,
+            "BlockedMediaFolders": block_folders,
+            # Jellyfin/Emby 不同版本可能支持不同字段，这里保持与 MiEmbybot 一致的最小集合
+        }
+
+    def create_user_with_password(self, username: str, password: str, *, apply_policy: bool = True,
+                                   policy: Optional[dict] = None) -> dict:
+        """
+        使用自定义用户名+密码创建 Emby 用户。
+        返回：{"emby_user_id": str, "username": str}
+        抛出异常时请捕获 requests.HTTPError。
+        """
+        # 1) 创建用户
+        url_new = f"{self.base_url}/Users/New"
+        headers = {"Content-Type": "application/json", "X-Emby-Token": self.token}
+        resp = requests.post(url_new, headers=headers, params={"api_key": self.token}, json={"Name": username})
+        if resp.status_code >= 300:
+            logger.error(f"Create user failed: {resp.status_code} {resp.text}")
+            resp.raise_for_status()
+        data = resp.json() or {}
+        user_id = data.get("Id")
+        if not user_id:
+            raise requests.HTTPError("Emby response missing Id for created user")
+
+        # 2) 设置密码（兼容不同服务器版本字段）
+        self.reset_password(user_id, password)
+
+        # 3) 可选：应用默认策略
+        if apply_policy:
+            pol = policy if policy is not None else self._create_policy()
+            self.set_policy(user_id, pol)
+
+        return {"emby_user_id": user_id, "username": username}
+
+    def reset_password(self, user_id: str, new_password: str) -> None:
+        """
+        重置/设置密码。优先尝试 {ResetPassword, NewPw}，如失败再尝试 {ResetPassword, NewPassword}。
+        失败将抛出 requests.HTTPError。
+        """
+        url = f"{self.base_url}/Users/{user_id}/Password"
+        headers = {"Content-Type": "application/json", "X-Emby-Token": self.token}
+
+        def _post(payload: dict):
+            return requests.post(url, headers=headers, params={"api_key": self.token}, json=payload)
+
+        # 先试 NewPw
+        r1 = _post({"ResetPassword": True, "NewPw": new_password, "CurrentPw": ""})
+        if r1.status_code >= 300:
+            logger.warning(f"reset_password(NewPw) failed: {r1.status_code} {r1.text}")
+            # 再试 NewPassword
+            r2 = _post({"ResetPassword": True, "NewPassword": new_password, "CurrentPassword": ""})
+            if r2.status_code >= 300:
+                logger.error(f"reset_password(NewPassword) failed: {r2.status_code} {r2.text}")
+                r2.raise_for_status()
+
+    def set_policy(self, user_id: str, policy: dict) -> None:
+        """
+        设置用户策略。
+        失败将抛出 requests.HTTPError。
+        """
+        url = f"{self.base_url}/Users/{user_id}/Policy"
+        headers = {"Content-Type": "application/json", "X-Emby-Token": self.token}
+        resp = requests.post(url, headers=headers, params={"api_key": self.token}, json=policy)
+        if resp.status_code >= 300:
+            logger.error(f"set_policy failed: {resp.status_code} {resp.text}")
+            resp.raise_for_status()
+
+        # 同时确保允许本地密码
+        try:
+            url_cfg = f"{self.base_url}/Users/{user_id}/Configuration"
+            cfg = {"EnableLocalPassword": True}
+            resp2 = requests.post(url_cfg, headers=headers, params={"api_key": self.token}, json=cfg)
+            if resp2.status_code >= 300:
+                logger.info(f"set policy config warn: {resp2.status_code} {resp2.text}")
+        except Exception as e:
+            logger.info(f"skip set configuration: {e}")
+
+    def delete_user(self, user_id: str) -> None:
+        """
+        删除 Emby 用户。失败将抛出 requests.HTTPError。
+        """
+        url = f"{self.base_url}/Users/{user_id}"
+        headers = {"X-Emby-Token": self.token}
+        resp = requests.delete(url, headers=headers, params={"api_key": self.token})
+        if resp.status_code >= 300:
+            logger.error(f"delete_user failed: {resp.status_code} {resp.text}")
+            resp.raise_for_status()
+
+
 if __name__ == "__main__":
     e = Emby()
     e.create_strm_file_for_existed_items(filter=["TV Shows"])
