@@ -92,8 +92,22 @@ def emby_set_password(user_id: str, new_password: str) -> None:
                 ok = True
         except Exception:
             ok = True  # 若无法校验，假定成功，避免阻断
-    if not ok:
-        logger.warning("Password may not have been set for user %s despite API success", user_id)
+    # 登录校验（尽最大努力，不记录密码）
+    try:
+        name = None
+        uinfo = emby_get_user(user_id)
+        if uinfo:
+            name = uinfo.get("Name")
+        if name:
+            if not emby_test_login(name, new_password):
+                # 某些版本要求使用 Password 字段登录，再试一遍
+                if not emby_test_login(name, new_password, use_password_field=True):
+                    logger.error("Password verification failed for user %s", user_id)
+                    raise HTTPException(status_code=500, detail="密码设置后校验未通过，请检查 Emby 配置")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("skip login verify due to error: %s", e)
 
 
 def emby_set_disabled(user_id: str, is_disabled: bool) -> None:
@@ -105,6 +119,28 @@ def emby_set_disabled(user_id: str, is_disabled: bool) -> None:
         txt = resp.text
         logger.error(txt)
         raise HTTPException(status_code=resp.status_code, detail=f"Update policy failed: {txt}")
+
+
+def emby_test_login(username: str, password: str, *, use_password_field: bool=False) -> bool:
+    """尝试使用用户名+密码在 Emby 进行一次认证，返回是否成功。
+    Jellyfin/Emby 一般使用 POST /Users/AuthenticateByName，Body: { Username, Pw }。
+    个别版本也接受 { Username, Password }。
+    """
+    try:
+        url = f"{EMBY_BASE_URL}/Users/AuthenticateByName"
+        body = {"Username": username}
+        if use_password_field:
+            body["Password"] = password
+        else:
+            body["Pw"] = password
+        # 不携带 X-Emby-Token，避免与密码登录冲突
+        resp = requests.post(url, headers={"Content-Type": "application/json"}, json=body)
+        if resp.status_code == 200:
+            return True
+        return False
+    except Exception as e:
+        logger.warning("emby_test_login error: %s", e)
+        return False
 
 
 def emby_enable_local_password(user_id: str) -> None:

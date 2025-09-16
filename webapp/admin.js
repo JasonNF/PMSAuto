@@ -1,5 +1,10 @@
 (function(){
   const logEl = document.getElementById('log');
+  // tabs
+  const tabBtns = Array.from(document.querySelectorAll('button.tab.small[data-admin-tab]'));
+  const secOverview = document.getElementById('admin-overview');
+  const secSettings = document.getElementById('admin-settings');
+  const secActivity = document.getElementById('admin-activity');
   const curEl = document.getElementById('current');
   const daysEl = document.getElementById('days');
   const btnLoad = document.getElementById('btn-load');
@@ -9,6 +14,10 @@
   const preset60 = document.getElementById('preset-60');
   const preset90 = document.getElementById('preset-90');
   const tokenEl = document.getElementById('token');
+  // overview stats
+  const statPlex = document.getElementById('stat-plex');
+  const statEmby = document.getElementById('stat-emby');
+  const statTotal = document.getElementById('stat-total');
   // wheel config
   const wheelLoadBtn = document.getElementById('wheel-load');
   const wheelSaveBtn = document.getElementById('wheel-save');
@@ -33,6 +42,7 @@
   const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
   const API_GET = origin + '/admin/settings/default_days';
   const API_POST = origin + '/admin/settings/default_days';
+  const API_OVERVIEW = origin + '/admin/overview';
   // donation
   const API_DON_GET = origin + '/admin/donation/get';
   const API_DON_SET = origin + '/admin/donation/set';
@@ -49,6 +59,33 @@
     if (!logEl) return;
     logEl.textContent += '\n' + msg;
   }
+
+  async function loadOverview(){
+    const t = tokenEl.value.trim(); if (!t){ return; }
+    try{
+      const resp = await fetch(API_OVERVIEW, { headers: { 'Authorization': 'Bearer ' + t } });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok){ log('读取概览失败：' + JSON.stringify(data)); return; }
+      const s = data.stats || {};
+      if (statPlex) statPlex.textContent = String(s.plex ?? '-');
+      if (statEmby) statEmby.textContent = String(s.emby ?? '-');
+      if (statTotal) statTotal.textContent = String(s.total ?? '-');
+    }catch(e){ log('读取概览异常：' + String(e)); }
+  }
+
+  function showAdminTab(name){
+    const map = { overview: secOverview, settings: secSettings, activity: secActivity };
+    for (const k of Object.keys(map)){
+      if (map[k]) map[k].classList.toggle('active', k===name);
+    }
+    tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.adminTab===name));
+    if (name==='overview') loadOverview();
+  }
+
+  tabBtns.forEach(btn => btn.addEventListener('click', ()=>{
+    const name = btn.dataset.adminTab;
+    showAdminTab(name);
+  }));
 
   async function load(){
     const t = tokenEl.value.trim();

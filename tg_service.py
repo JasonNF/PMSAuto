@@ -15,7 +15,7 @@ from aiogram.types import Update, BotCommand
 from bot.telegram_bot import bot, dp, build_open_keyboard
 from fastapi.middleware.cors import CORSMiddleware
 
-from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name, emby_enable_local_password
+from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name, emby_enable_local_password, emby_test_login
 
 from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Settings, WatchStat, DonationStat, DailySnapshot, UserPref, Base, engine
 from log import logger
@@ -79,6 +79,25 @@ def _startup_create_tables():
                         db.commit()
         finally:
             db.close()
+
+
+# 管理员：测试用户名+密码是否能登录 Emby（排错用）
+@app.post("/admin/user/test_login")
+async def admin_user_test_login(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    username = (body.get("username") or "").strip()
+    password = (body.get("password") or "").strip()
+    if not username or not password:
+        raise HTTPException(400, "username/password 必填")
+    try:
+        ok = emby_test_login(username, password)
+        if not ok:
+            ok = emby_test_login(username, password, use_password_field=True)
+        return {"ok": ok}
+    except Exception as e:
+        raise HTTPException(500, f"测试登录异常: {e}")
         logger.info("数据库表检查/创建完成")
     except Exception as e:
         # 不阻断启动，但打印错误便于排查
@@ -115,6 +134,20 @@ async def admin_get_default_days(request: Request):
     db = SessionLocal()
     try:
         return {"default_initial_days": _get_default_initial_days(db)}
+    finally:
+        db.close()
+
+
+@app.get("/admin/overview")
+async def admin_overview(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    db = SessionLocal()
+    try:
+        total = db.query(UserAccount).count()
+        emby_active = db.query(UserAccount).filter(UserAccount.status == "active").count()
+        plex_users = 0  # 目前未集成 Plex 用户表，先占位
+        return {"ok": True, "stats": {"plex": plex_users, "emby": emby_active, "total": total}}
     finally:
         db.close()
 
@@ -1003,7 +1036,24 @@ async def app_register(request: Request):
     user_id = emby_user.get("Id")
     if not user_id:
         raise HTTPException(500, "Emby 响应缺少 Id")
+    # 确保启用本地密码策略后再设置密码，避免出现“空密码可登录”的情况
+    try:
+        emby_enable_local_password(user_id)
+    except Exception:
+        pass
     emby_set_password(user_id, password)
+    # 立即校验密码是否可用，避免出现“实际空密码可登录”的情况
+    try:
+        ok = emby_test_login(username, password)
+        if not ok:
+            ok = emby_test_login(username, password, use_password_field=True)
+        if not ok:
+            raise HTTPException(500, "密码设置后校验未通过，请稍后重试或联系管理员")
+    except HTTPException:
+        raise
+    except Exception:
+        # 校验异常时，不阻断，但建议记录
+        logger.warning("register password verify skipped due to exception")
     from datetime import timedelta, datetime as dt
     db = SessionLocal()
     try:
