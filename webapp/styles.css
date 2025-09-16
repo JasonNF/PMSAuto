@@ -215,6 +215,8 @@ body.sf-ready .tab .svg-fallback{ display:none; }
 /* 表单样式（弹层内） */
 .modal .form{ display:flex; flex-direction: column; gap:12px; padding: 6px 2px; }
 .modal .form-row{ display:flex; flex-direction: column; gap:6px; }
+.modal .form-row.inline{ flex-direction: row; align-items:center; justify-content:flex-start; gap:10px; }
+.modal .form-row .chk{ display:inline-flex; align-items:center; gap:8px; user-select:none; cursor:pointer; }
 .modal .form-row label{ font-size: 13px; color:#64748b; }
 .modal .form-row input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(15,23,42,.12); outline:none; }
 .modal .form-row input:focus{ border-color:#6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
