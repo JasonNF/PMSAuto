@@ -16,6 +16,7 @@ from bot.telegram_bot import bot, dp, build_open_keyboard
 from fastapi.middleware.cors import CORSMiddleware
 
 from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name, emby_enable_local_password, emby_test_login, emby_enable_local_password_config
+from emby import Emby
 
 from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Settings, WatchStat, DonationStat, DailySnapshot, UserPref, Base, engine
 from log import logger
@@ -1015,17 +1016,12 @@ async def app_register(request: Request):
     tg_id = verified.get("tg_id")
     if not tg_id:
         raise HTTPException(400, "未获取到 Telegram 用户")
-    emby_user = emby_create_user(username)
-    user_id = emby_user.get("Id")
+    # 使用内置 Emby 客户端创建用户并设置密码/策略
+    e = Emby()
+    ret = e.create_user_with_password(username=username, password=password, apply_policy=True)
+    user_id = ret.get("emby_user_id")
     if not user_id:
         raise HTTPException(500, "Emby 响应缺少 Id")
-    # 确保启用本地密码策略后再设置密码，避免出现“空密码可登录”的情况
-    try:
-        emby_enable_local_password(user_id)
-        emby_enable_local_password_config(user_id)
-    except Exception:
-        pass
-    emby_set_password(user_id, password)
     # 立即校验密码是否可用，避免出现“实际空密码可登录”的情况
     try:
         ok = emby_test_login(username, password)
