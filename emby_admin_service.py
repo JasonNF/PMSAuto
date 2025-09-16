@@ -163,6 +163,26 @@ def emby_enable_local_password(user_id: str) -> None:
         raise HTTPException(status_code=resp.status_code, detail=f"Enable local password failed: {txt}")
 
 
+def emby_enable_local_password_config(user_id: str) -> None:
+    """确保用户配置启用本地密码（Configuration.EnableLocalPassword=True）。
+    一些 Emby 前端登录是否要求密码取决于此配置，而不仅仅是 Policy。
+    """
+    # 读取当前配置
+    try:
+        u = emby_get_user(user_id) or {}
+        conf = (u.get("Configuration") or {}).copy()
+    except Exception:
+        conf = {}
+    conf.setdefault("EnableLocalPassword", True)
+    conf["EnableLocalPassword"] = True
+    url = f"{EMBY_BASE_URL}/Users/{user_id}/Configuration"
+    resp = requests.post(url, headers=HEADERS, params={"api_key": EMBY_API_TOKEN}, json=conf)
+    if resp.status_code >= 300:
+        txt = resp.text
+        logger.error("enable_local_password_config failed: %s", txt)
+        raise HTTPException(status_code=resp.status_code, detail=f"Enable local password config failed: {txt}")
+
+
 def emby_find_user_by_name(username: str) -> dict | None:
     """尝试通过 Emby Users 列表查找同名用户，避免重复创建。
     说明：不同 Emby 版本的搜索参数可能存在差异，这里使用全量列表做一次本地精确匹配，兼容性最好。

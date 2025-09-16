@@ -15,7 +15,7 @@ from aiogram.types import Update, BotCommand
 from bot.telegram_bot import bot, dp, build_open_keyboard
 from fastapi.middleware.cors import CORSMiddleware
 
-from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name, emby_enable_local_password, emby_test_login
+from emby_admin_service import emby_create_user, emby_set_password, emby_find_user_by_name, emby_enable_local_password, emby_test_login, emby_enable_local_password_config
 
 from emby_admin_models import SessionLocal, UserAccount, RenewalCode, Settings, WatchStat, DonationStat, DailySnapshot, UserPref, Base, engine
 from log import logger
@@ -153,6 +153,7 @@ async def app_reset_password(request: Request):
         # 确保本地密码策略开启，再设置密码
         try:
             emby_enable_local_password(ua.emby_user_id)
+            emby_enable_local_password_config(ua.emby_user_id)
         except Exception:
             pass
         emby_set_password(ua.emby_user_id, new_password)
@@ -1021,6 +1022,7 @@ async def app_register(request: Request):
     # 确保启用本地密码策略后再设置密码，避免出现“空密码可登录”的情况
     try:
         emby_enable_local_password(user_id)
+        emby_enable_local_password_config(user_id)
     except Exception:
         pass
     emby_set_password(user_id, password)
