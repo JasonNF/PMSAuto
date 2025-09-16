@@ -98,24 +98,6 @@ async def admin_user_test_login(request: Request):
         return {"ok": ok}
     except Exception as e:
         raise HTTPException(500, f"测试登录异常: {e}")
-        logger.info("数据库表检查/创建完成")
-    except Exception as e:
-        # 不阻断启动，但打印错误便于排查
-        logger.error("数据库表创建失败: %s", e)
-    # 启动每日 00:01 定时任务
-    try:
-        scheduler = Scheduler()
-        scheduler.add_job(
-            _cron_daily_points_notify,
-            trigger="cron",
-            hour=0,
-            minute=1,
-            id="daily_points_notify",
-            replace_existing=True,
-        )
-        logger.info("每日积分变动通知任务已注册 (00:01)")
-    except Exception as e:
-        logger.warning("注册定时任务失败: %s", e)
 
 
 # ---- Admin Settings (Bearer 保护) ----
