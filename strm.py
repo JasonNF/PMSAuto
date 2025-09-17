@@ -1,10 +1,39 @@
+import os
 import shutil
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
 from log import logger
-from settings import GID, STRM_FILE_PATH, STRM_MEDIA_SOURCE, UID
+
+# 兼容性读取设置：优先 settings.py，其次环境变量，最后默认值
+try:
+    import settings as _cfg
+except Exception:  # pragma: no cover
+    _cfg = object()
+
+UID = getattr(_cfg, "UID", os.environ.get("UID"))
+GID = getattr(_cfg, "GID", os.environ.get("GID"))
+STRM_FILE_PATH = getattr(
+    _cfg,
+    "STRM_FILE_PATH",
+    getattr(_cfg, "EMBY_STRM_ASSISTANT_MEDIAINFO", os.environ.get("STRM_FILE_PATH", "/tmp/strm")),
+)
+STRM_MEDIA_SOURCE = getattr(
+    _cfg,
+    "STRM_MEDIA_SOURCE",
+    os.environ.get("STRM_MEDIA_SOURCE", "http://127.0.0.1:8000"),
+)
+
+# 将字符串 UID/GID 转为 int；失败则使用 None（跳过 chown）
+def _to_int(x):
+    try:
+        return int(x)
+    except Exception:
+        return None
+
+_UID = _to_int(UID)
+_GID = _to_int(GID)
 
 
 def create_strm_file(
@@ -41,10 +70,14 @@ def create_strm_file(
         # 写入 .strm 文件
         strm_file_full_path.write_text(strm_content, encoding="utf-8")
 
-        # 设置权限
-        for item in strm_path.rglob("*"):
-            shutil.chown(str(item), user=UID, group=GID)
-        shutil.chown(str(strm_path), user=UID, group=GID)
+        # 设置权限（仅当提供了有效的 UID/GID 时）
+        if _UID is not None and _GID is not None:
+            try:
+                for item in strm_path.rglob("*"):
+                    shutil.chown(str(item), user=_UID, group=_GID)
+                shutil.chown(str(strm_path), user=_UID, group=_GID)
+            except Exception as e:
+                logger.info(f"chown 跳过: {e}")
 
         logger.info(f"为 {file_path} 创建 strm 文件成功: {strm_file_full_path}")
         return True

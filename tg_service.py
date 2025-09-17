@@ -156,11 +156,20 @@ async def app_reset_password(request: Request):
             raise HTTPException(404, "未绑定账户")
         # 确保本地密码策略开启，再设置密码
         try:
+            logger.info("[reset_password][enable] emby_user_id=%s username=%s -> enable local password (policy+config)", ua.emby_user_id, ua.username)
             emby_enable_local_password(ua.emby_user_id)
             emby_enable_local_password_config(ua.emby_user_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.info("[reset_password][enable] skip/warn: %s", e)
+        logger.info("[reset_password][set] emby_user_id=%s username=%s -> set password", ua.emby_user_id, ua.username)
         emby_set_password(ua.emby_user_id, new_password)
+        # 设密后做强校验（先 Pw 再 Password），仅记录日志，不改变原有返回结构
+        try:
+            ok_pw = emby_test_login(ua.username, new_password)
+            ok_pwd = ok_pw or emby_test_login(ua.username, new_password, use_password_field=True)
+            logger.info("[reset_password][verify] username=%s ok_pw=%s ok_password=%s", ua.username, ok_pw, ok_pwd)
+        except Exception as e:
+            logger.info("[reset_password][verify] exception: %s", e)
         return {"ok": True}
     finally:
         db.close()
@@ -213,12 +222,80 @@ async def admin_user_reset_password(request: Request):
             raise HTTPException(404, "未找到该用户名对应的 Emby 账户")
         emby_user_id = info.get("Id")
     try:
+        logger.info("[admin_reset_password][set] emby_user_id=%s username=%s", emby_user_id, (username or ""))
         emby_set_password(emby_user_id, new_password)
+        # 如提供了 username，顺便做一次强校验
+        if username:
+            try:
+                ok_pw = emby_test_login(username, new_password)
+                ok_pwd = ok_pw or emby_test_login(username, new_password, use_password_field=True)
+                logger.info("[admin_reset_password][verify] username=%s ok_pw=%s ok_password=%s", username, ok_pw, ok_pwd)
+            except Exception as e:
+                logger.info("[admin_reset_password][verify] exception: %s", e)
         return {"ok": True, "emby_user_id": emby_user_id}
     except HTTPException as e:
         raise e
     except Exception as e:
         raise HTTPException(500, f"重置密码失败: {e}")
+
+
+# ---- Admin: 一键修复本地密码开关并可选重置密码（Bearer 保护） ----
+@app.post("/admin/user/fix_local_password")
+async def admin_user_fix_local_password(request: Request):
+    if not _check_admin_auth(request):
+        raise HTTPException(401, "Unauthorized")
+    body = await request.json()
+    emby_user_id = (body.get("emby_user_id") or "").strip()
+    username = (body.get("username") or "").strip()
+    new_password = (body.get("new_password") or "").strip()
+    if not emby_user_id and not username:
+        raise HTTPException(400, "emby_user_id 或 username 必填其一")
+    # 若仅提供用户名，则查询得到 emby_user_id
+    if not emby_user_id:
+        info = emby_find_user_by_name(username)
+        if not info or not info.get("Id"):
+            raise HTTPException(404, "未找到该用户名对应的 Emby 账户")
+        emby_user_id = info.get("Id")
+    # 若仅提供 emby_user_id，没有 username，则尝试回填 username（便于校验）
+    if not username:
+        try:
+            info = emby_find_user_by_name(None)  # 不支持按ID反查时忽略
+        except Exception:
+            info = None
+    # 执行修复
+    steps = {"enable_policy": False, "enable_config": False, "set_password": False, "verify_pw": None, "verify_password": None}
+    try:
+        logger.info("[fix_local_password][enable] emby_user_id=%s username=%s", emby_user_id, (username or ""))
+        emby_enable_local_password(emby_user_id)
+        steps["enable_policy"] = True
+    except Exception as e:
+        logger.info("[fix_local_password][enable][policy] warn: %s", e)
+    try:
+        emby_enable_local_password_config(emby_user_id)
+        steps["enable_config"] = True
+    except Exception as e:
+        logger.info("[fix_local_password][enable][config] warn: %s", e)
+    if new_password:
+        try:
+            logger.info("[fix_local_password][set] emby_user_id=%s username=%s", emby_user_id, (username or ""))
+            emby_set_password(emby_user_id, new_password)
+            steps["set_password"] = True
+        except Exception as e:
+            logger.info("[fix_local_password][set] error: %s", e)
+    # 校验（仅当提供了 username 与 new_password 时意义最大）
+    if username and (new_password or True):
+        try:
+            ok_pw = emby_test_login(username, new_password or "")
+        except Exception:
+            ok_pw = False
+        steps["verify_pw"] = bool(ok_pw)
+        try:
+            ok_pwd = ok_pw or emby_test_login(username, new_password or "", use_password_field=True)
+        except Exception:
+            ok_pwd = False
+        steps["verify_password"] = bool(ok_pwd)
+        logger.info("[fix_local_password][verify] username=%s ok_pw=%s ok_password=%s", username, steps["verify_pw"], steps["verify_password"])
+    return {"ok": True, "emby_user_id": emby_user_id, "username": username or None, "steps": steps}
 
 
 @app.post("/admin/user/set_expires_by_name")
